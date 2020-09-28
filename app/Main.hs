@@ -1,6 +1,6 @@
 module Main where
 
-import           MyProject
+import           Project
 
 main :: IO ()
 main = run

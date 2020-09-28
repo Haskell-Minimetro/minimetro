@@ -79,8 +79,8 @@ map (+1) :: Num b => [b] -> [b]
 - `:l` or `:load` — load file or module:
 
 ```
->>> :load src/MyProject.hs
-[1 of 1] Compiling MyProject        ( src/MyProject.hs, interpreted )
+>>> :load src/Project.hs
+[1 of 1] Compiling Project        ( src/Project.hs, interpreted )
 Ok, one module loaded.
 ```
 
