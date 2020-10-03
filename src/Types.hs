@@ -34,5 +34,6 @@ data Route = Route Color Position Position
 data GameState = GameState {
                             getStations     :: [Station],
                             getRoutes       :: [Route],
-                            getLocomotives  :: [Locomotive]
+                            getLocomotives  :: [Locomotive],
+                            getCurrentTime  :: Double
                             }

@@ -7,6 +7,7 @@ import Types
 import Data.Text (pack) -- TODO: don't forget to remove this
 import ActivityOfEnhancements
 import System.Random
+import Data.Fixed
 
 maxPassangers :: Int
 maxPassangers = 30
@@ -161,13 +162,10 @@ transferLocomotive (first:rest) locomotive
 
 data TimePassed world = TimePassed Double world
 
-withTimePassing :: forall world. Double -> (Double -> world -> world) -> (Double -> TimePassed world ->  TimePassed world)
-withTimePassing threshold updateWorld = newFunc
-  where
-    newFunc :: Double -> TimePassed world -> TimePassed world
-    newFunc dt (TimePassed timePassed state) 
-      | timePassed > threshold = TimePassed 0 (updateWorld dt state)
-      | otherwise = TimePassed (timePassed + dt) state
+withTimePassing :: forall world. Double -> Double -> (Double -> world -> world) -> (Double -> world -> world)
+withTimePassing currentTime threshold func
+  | currentTime `mod'` threshold < 0.05 = func
+  | otherwise = const id
 
 
 -- TODO: add exponential grow of appearance of new passengers
@@ -191,13 +189,16 @@ updateDynamic dt state = newState
     routes = getRoutes state
     locomotives = getLocomotives state
     updatedLocomotives = map (transferLocomotive routes . updateLocomotivePosition dt) locomotives -- . filter (\(Locomotive _ _ _ progress) -> withinError progress 1.0 1e-1 || withinError progress 0.0 1e-1)
+    newTime = dt + currentTime
+    currentTime = getCurrentTime state
 
-    newFunc = withTimePassing 10 updateStation
-    updatedStations = map (newFunc dt) stations
+    updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
     newState = GameState
                 updatedStations
                 routes
                 updatedLocomotives
+                newTime
+
 
 -- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
@@ -216,6 +217,7 @@ initialSystem = GameState [
   ]
   [Route brown (3,4) (2, -6), Route brown (2, -6) (-4, 2)]
   [Locomotive (Route brown (3,4) (2, -6)) [] Forward 0.0]
+  0
 
 isGameOver :: GameState -> Bool
 isGameOver state = stationsAreFull (getStations state)
