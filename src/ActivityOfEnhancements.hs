@@ -13,10 +13,6 @@ type ActivityOf world
 data WithStartScreen world
   = StartScreen  -- ˆ Start screen.
     | GameOn world -- ˆ Game is on with 'world' state.
--- | Add start screen to 'activityOf'.
-withStartScreen
-  :: forall world. ActivityOf (WithStartScreen world)
-  -> ActivityOf world
   
 startScreen :: Picture
 startScreen = lettering "Mini Metro\n[press SPACE to start]" <> background
@@ -24,6 +20,9 @@ startScreen = lettering "Mini Metro\n[press SPACE to start]" <> background
     background = colored (lighter 0.5 brown) (solidRectangle 100 100)
 
 -- | Add start screen to 'activityOf'.
+withStartScreen
+  :: forall world. ActivityOf (WithStartScreen world)
+  -> ActivityOf world
 withStartScreen oldActivity startingWorld userHandle userDraw = oldActivity StartScreen newHandle newDraw
   where
     newHandle (KeyPress " ") StartScreen  = GameOn startingWorld
@@ -32,6 +31,7 @@ withStartScreen oldActivity startingWorld userHandle userDraw = oldActivity Star
     
     newDraw StartScreen   = startScreen
     newDraw (GameOn s)    = userDraw s
+
 -- | Make 'activityOf' resettable on Esc.
 withReset :: ActivityOf world -> ActivityOf world
 withReset originalActivityOf userWorld userHandler =

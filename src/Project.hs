@@ -46,7 +46,7 @@ drawCurrentDate :: Double -> Picture
 drawCurrentDate _time = blank
 
 drawStation :: Station -> Picture
-drawStation (Station stationType (x, y) passangers) 
+drawStation (Station stationType (x, y) passangers _) 
   = translated x y (drawStationType stationType) <> drawPassengersOnStation (x, y) passangers
 
 
@@ -61,7 +61,7 @@ drawPassengersOnStation (x, y) passengers = translated (x+0.5) (y+0.5) (passes p
   where
     passes :: [Passenger] -> Picture
     passes [] = blank
-    passes passenger =drawInARow (take 10 passenger) 0.25 drawPassanger <> translated 0 0.25 (passes (drop 10 passenger))
+    passes passenger = drawInARow (take 10 passenger) 0.25 drawPassanger <> translated 0 0.25 (passes (drop 10 passenger))
 
 renderStations :: [Station] -> Picture
 renderStations = pictures . map drawStation 
@@ -160,20 +160,21 @@ transferLocomotive (first:rest) locomotive
       currentPosition = getTrainPositionWithProgress (getLocomotivePosition locomotive) pos1 pos2
 
 -- data TimePassed world = TimePassed Double world
--- withTimePassing :: Double -> (Double -> TimePassed world -> TimePassed world) -> (Double -> world -> world)
--- withTimePassing threshold updateWorld = newUpdateWorld
---   where
---     newUpdateWorld time (TimePassed accumulator state)
---       | if accumulator > threshold = updateWorld time
---       | otherwise = 
 
--- TODO: add randomness to passenger addition
+-- withTimePassing :: forall world. Double -> (Double -> TimePassed world -> TimePassed world) -> (Double -> world ->  world)
+-- withTimePassing threshold updateWorld = newFunc
+--   where
+--     newFunc :: Double -> world -> world
+--     newFunc dt state 
+--       | dt < threshold = updateWorld dt (TimePassed dt state)
+--       | otherwise = state
+
+
 -- TODO: add exponential grow of appearance of new passengers
 updateStation :: Double -> Station -> Station
-updateStation _dt (Station stationType pos passengers) = Station stationType pos newPassengers
+updateStation _dt (Station stationType pos passengers gen) = Station stationType pos newPassengers newGen
   where
-    (number, _newGen) = randomR (0 :: Int, 2) (mkStdGen 9)
-
+    (number, newGen) = randomR (0 :: Int, 2) gen
     newPassengers = passengers ++ [getRandomPassenger number]
 
 
@@ -191,7 +192,7 @@ updateDynamic dt state = newState
     locomotives = getLocomotives state
     updatedLocomotives = map (transferLocomotive routes . updateLocomotivePosition dt) locomotives -- . filter (\(Locomotive _ _ _ progress) -> withinError progress 1.0 1e-1 || withinError progress 0.0 1e-1)
 
-
+    -- newFunc = withTimePassing 10 updateStation
     updatedStations = map (updateStation dt) stations
     newState = GameState
                 updatedStations
@@ -206,12 +207,12 @@ updateGameState _ state = state
 
 initialSystem :: GameState
 initialSystem = GameState [
-    Station Circle (3, 4) [],
+    Station Circle (3, 4) [] (mkStdGen 42),
                           --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
                           --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
                           --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
-    Station Rectangle (2, -6) [],
-    Station Triangle (-4, 2) []
+    Station Rectangle (2, -6) [] (mkStdGen 41),
+    Station Triangle (-4, 2) [] (mkStdGen 40)
   ]
   [Route brown (3,4) (2, -6), Route brown (2, -6) (-4, 2)]
   [Locomotive (Route brown (3,4) (2, -6)) [] Forward 0.0]
@@ -221,7 +222,7 @@ isGameOver state = stationsAreFull (getStations state)
   where
     stationsAreFull :: [Station] -> Bool
     stationsAreFull [] = False
-    stationsAreFull (first:rest) = length (getStationPassengers first) > maxPassangers || stationsAreFull rest
+    stationsAreFull (first:rest) = length (getStationPassengers first) >= maxPassangers || stationsAreFull rest
 
 -- TODO: Maybe some better showage that its over
 withGameOver :: forall world. (world -> Bool) -> ActivityOf world -> ActivityOf world

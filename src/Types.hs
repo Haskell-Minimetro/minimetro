@@ -1,5 +1,6 @@
 module Types where
 import CodeWorld
+import System.Random
 
 type Position = Point
 data Asset = Bridge | Train | Wagon
@@ -13,7 +14,8 @@ data Passenger = Passenger StationType
 data Station = Station {
                         getStationType               :: StationType,
                         getStationPosition           :: Position,
-                        getStationPassengers         :: [Passenger]
+                        getStationPassengers         :: [Passenger],
+                        getPassengerGen              :: StdGen 
                         }
 
 
