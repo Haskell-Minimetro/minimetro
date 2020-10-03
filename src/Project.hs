@@ -159,15 +159,15 @@ transferLocomotive (first:rest) locomotive
       (Route color2 pos1 pos2) = getLocomotiveRoute locomotive 
       currentPosition = getTrainPositionWithProgress (getLocomotivePosition locomotive) pos1 pos2
 
--- data TimePassed world = TimePassed Double world
+data TimePassed world = TimePassed Double world
 
--- withTimePassing :: forall world. Double -> (Double -> TimePassed world -> TimePassed world) -> (Double -> world ->  world)
--- withTimePassing threshold updateWorld = newFunc
---   where
---     newFunc :: Double -> world -> world
---     newFunc dt state 
---       | dt < threshold = updateWorld dt (TimePassed dt state)
---       | otherwise = state
+withTimePassing :: forall world. Double -> (Double -> world -> world) -> (Double -> TimePassed world ->  TimePassed world)
+withTimePassing threshold updateWorld = newFunc
+  where
+    newFunc :: Double -> TimePassed world -> TimePassed world
+    newFunc dt (TimePassed timePassed state) 
+      | timePassed > threshold = TimePassed 0 (updateWorld dt state)
+      | otherwise = TimePassed (timePassed + dt) state
 
 
 -- TODO: add exponential grow of appearance of new passengers
@@ -192,8 +192,8 @@ updateDynamic dt state = newState
     locomotives = getLocomotives state
     updatedLocomotives = map (transferLocomotive routes . updateLocomotivePosition dt) locomotives -- . filter (\(Locomotive _ _ _ progress) -> withinError progress 1.0 1e-1 || withinError progress 0.0 1e-1)
 
-    -- newFunc = withTimePassing 10 updateStation
-    updatedStations = map (updateStation dt) stations
+    newFunc = withTimePassing 10 updateStation
+    updatedStations = map (newFunc dt) stations
     newState = GameState
                 updatedStations
                 routes
