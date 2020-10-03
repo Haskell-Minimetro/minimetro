@@ -124,21 +124,17 @@ getStationByCoord p state = myStations
     myStations = listToMaybe $ (filter (\a -> (withinErrorPosition (getStationPosition a) p 1)) (getStations state))
 
 handleClick :: Point -> GameState -> GameState
-handleClick p state@(GameState stations routes locos Play time) = turnConstructionOn
+handleClick point state@(GameState stations routes locos Play time) = turnConstructionOn
   where
-    isStation = getStationByCoord p state
-
     turnConstructionOn =
-      case isStation of
+      case (getStationByCoord point state) of
         Nothing -> state
         Just x -> (GameState stations routes locos (Construction (x)) time)
 
-handleClick p state@(GameState stations routes locos (Construction startStation) time) = turnConstructionOff
+handleClick point state@(GameState stations routes locos (Construction startStation) time) = turnConstructionOff
   where
-    isStation = getStationByCoord p state
-
     turnConstructionOff =
-      case isStation of
+      case (getStationByCoord point state) of
         Nothing -> state
         Just x -> (GameState stations newRoutes locos Play time)
           where
