@@ -8,6 +8,7 @@ import ActivityOfEnhancements
 import CodeWorld
 import Drawers
 import System.Random
+import Data.Fixed
 import Types
 
 maxPassangers :: Int
@@ -68,15 +69,10 @@ transferLocomotive (first : rest) locomotive
     (Route color2 pos1 pos2) = getLocomotiveRoute locomotive
     currentPosition = getTrainPositionWithProgress (getLocomotivePosition locomotive) pos1 pos2
 
--- data TimePassed world = TimePassed Double world
-
--- withTimePassing :: forall world. Double -> (Double -> TimePassed world -> TimePassed world) -> (Double -> world ->  world)
--- withTimePassing threshold updateWorld = newFunc
---   where
---     newFunc :: Double -> world -> world
---     newFunc dt state
---       | dt < threshold = updateWorld dt (TimePassed dt state)
---       | otherwise = state
+withTimePassing :: forall world. Double -> Double -> (Double -> world -> world) -> (Double -> world -> world)
+withTimePassing currentTime threshold func
+  | currentTime `mod'` threshold < 0.05 = func
+  | otherwise = const id
 
 -- TODO: add exponential grow of appearance of new passengers
 updateStation :: Double -> Station -> Station
@@ -98,14 +94,15 @@ updateDynamic dt state = newState
     routes = getRoutes state
     locomotives = getLocomotives state
     updatedLocomotives = map (transferLocomotive routes . updateLocomotivePosition dt) locomotives -- . filter (\(Locomotive _ _ _ progress) -> withinError progress 1.0 1e-1 || withinError progress 0.0 1e-1)
+    newTime = dt + currentTime
+    currentTime = getCurrentTime state
 
-    -- newFunc = withTimePassing 10 updateStation
-    updatedStations = map (updateStation dt) stations
-    newState =
-      GameState
-        updatedStations
-        routes
-        updatedLocomotives
+    updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
+    newState = GameState
+                updatedStations
+                routes
+                updatedLocomotives
+                newTime
 
 -- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
@@ -114,17 +111,17 @@ updateGameState (TimePassing dt) state = updateDynamic dt state
 updateGameState _ state = state
 
 initialSystem :: GameState
-initialSystem =
-  GameState
-    [ Station Circle (3, 4) [] (mkStdGen 42),
-      --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
-      --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
-      --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
-      Station Rectangle (2, -6) [] (mkStdGen 41),
-      Station Triangle (-4, 2) [] (mkStdGen 40)
-    ]
-    [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
-    [Locomotive (Route brown (3, 4) (2, -6)) [] Forward 0.0]
+initialSystem = GameState [
+    Station Circle (3, 4) [] (mkStdGen 42),
+                          --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
+                          --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
+                          --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
+    Station Rectangle (2, -6) [] (mkStdGen 41),
+    Station Triangle (-4, 2) [] (mkStdGen 40)
+  ]
+  [Route brown (3,4) (2, -6), Route brown (2, -6) (-4, 2)]
+  [Locomotive (Route brown (3,4) (2, -6)) [] Forward 0.0]
+  0
 
 isGameOver :: GameState -> Bool
 isGameOver state = stationsAreFull (getStations state)
