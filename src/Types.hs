@@ -1,3 +1,7 @@
+module Types where
+import CodeWorld
+
+type Position = Point
 data Asset = Bridge | Train | Wagon
 data Object = Object Asset Position
 type ObjectDrawer = Object -> Picture
