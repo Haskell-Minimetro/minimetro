@@ -6,9 +6,11 @@ module Project where
 -- TODO: don't forget to remove this
 import ActivityOfEnhancements
 import CodeWorld
+import Data.Fixed
+import Data.Maybe (isNothing, listToMaybe)
+import Data.Text (pack)
 import Drawers
 import System.Random
-import Data.Fixed
 import Types
 
 maxPassangers :: Int
@@ -17,6 +19,8 @@ maxPassangers = 30
 drawGameState :: GameState -> Picture
 drawGameState gameState =
   renderObject drawStation (getStations gameState)
+    <> translated (-9) (-6) (lettering (pack $ show (getCurrentMode gameState)))
+    <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
     <> renderObject drawLocomotive (getLocomotives gameState)
     <> renderObject drawRoute (getRoutes gameState)
     <> backgroundImage
@@ -98,30 +102,62 @@ updateDynamic dt state = newState
     currentTime = getCurrentTime state
 
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
-    newState = GameState
-                updatedStations
-                routes
-                updatedLocomotives
-                newTime
+    newState =
+      GameState
+        updatedStations
+        routes
+        updatedLocomotives
+        (getCurrentMode state)
+        newTime
 
 -- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
 updateGameState :: Event -> GameState -> GameState
+updateGameState (PointerPress p) state = handleClick p state
 updateGameState (TimePassing dt) state = updateDynamic dt state
 updateGameState _ state = state
 
+getStationByCoord :: Point -> GameState -> Maybe Station
+getStationByCoord p state = myStations
+  where
+    myStations :: Maybe Station
+    myStations = listToMaybe $ (filter (\a -> (withinErrorPosition (getStationPosition a) p 1)) (getStations state))
+
+handleClick :: Point -> GameState -> GameState
+handleClick point state@(GameState stations routes locos Play time) = turnConstructionOn
+  where
+    turnConstructionOn =
+      case (getStationByCoord point state) of
+        Nothing -> state
+        Just x -> (GameState stations routes locos (Construction (x)) time)
+
+handleClick point state@(GameState stations routes locos (Construction startStation) time) = turnConstructionOff
+  where
+    turnConstructionOff =
+      case (getStationByCoord point state) of
+        Nothing -> state
+        Just x -> (GameState stations newRoutes locos Play time)
+          where
+            newRoutes :: [Route]
+            newRoutes = [Route brown (getStationPosition startStation) (getStationPosition x)] ++ routes
+
+handleClick _ (GameState stations routes locos mode time) = (GameState stations routes locos mode time)
+
 initialSystem :: GameState
-initialSystem = GameState [
-    Station Circle (3, 4) [] (mkStdGen 42),
-                          --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
-                          --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
-                          --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
-    Station Rectangle (2, -6) [] (mkStdGen 41),
-    Station Triangle (-4, 2) [] (mkStdGen 40)
-  ]
-  [Route brown (3,4) (2, -6), Route brown (2, -6) (-4, 2)]
-  [Locomotive (Route brown (3,4) (2, -6)) [] Forward 0.0]
-  0
+initialSystem =
+  GameState
+    [ Station Circle (3, 4) [] (mkStdGen 42),
+      --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
+      --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
+      --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
+      Station Rectangle (2, -6) [] (mkStdGen 41),
+      Station Triangle (-4, 2) [] (mkStdGen 40),
+      Station Triangle (4, 2) [] (mkStdGen 40)
+    ]
+    [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
+    [Locomotive (Route brown (3, 4) (2, -6)) [] Forward 0.0]
+    Play
+    0
 
 isGameOver :: GameState -> Bool
 isGameOver state = stationsAreFull (getStations state)
@@ -149,4 +185,4 @@ run2 :: IO ()
 run2 = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState
 
 run :: IO ()
-run = activityOf initialSystem updateGameState drawGameState
+run = debugActivityOf initialSystem updateGameState drawGameState
