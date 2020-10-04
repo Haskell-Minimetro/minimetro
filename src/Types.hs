@@ -12,6 +12,7 @@ type ObjectDrawer = Object -> Picture
 data Figure = TriangleFigure | SquareFigure | CircleFigure
 data StationType = Triangle | Rectangle | Circle
   deriving (Eq, Show)
+
 data Passenger = Passenger StationType
   deriving (Eq, Show)
 
@@ -26,11 +27,13 @@ data Station = Station {
 
 data Direction = Forward | Backward
   deriving (Eq, Show)
+
+data StationStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
+  deriving (Show)
 data Locomotive = Locomotive {
-                              getLocomotiveRoute           :: Route,
                               getLocomotivePassengers      :: [Passenger],
                               getLocomotiveDirection       :: Direction,
-                              getLocomotivePosition        :: Double
+                              getLocomotiveStatus          :: StationStatus
                               }
 
 data Route = Route Color Position Position
