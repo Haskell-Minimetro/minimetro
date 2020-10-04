@@ -1,6 +1,7 @@
 module Drawers where 
 import  Types
 import CodeWorld
+import Data.Text (pack)
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -68,9 +69,10 @@ drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positi
   where
     positions = [station1, station2]
 
--- TODO: remove debug stuff
 drawLocomotive :: Locomotive -> Picture
-drawLocomotive (Locomotive trainPassangers _ others) = drawing
+drawLocomotive (Locomotive trainPassangers direction others) = drawing
+  <> translated (-9) (-8) (lettering (pack $ show  direction))
+  <> translated (-9) (-9) (lettering (pack $ show  others))
   where
     drawing =
       case others of 

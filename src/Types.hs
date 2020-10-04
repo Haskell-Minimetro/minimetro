@@ -24,6 +24,7 @@ data Direction = Forward | Backward
   deriving (Eq, Show)
 
 data StationStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
+  deriving (Show)
 data Locomotive = Locomotive {
                               getLocomotivePassengers      :: [Passenger],
                               getLocomotiveDirection       :: Direction,
@@ -31,7 +32,7 @@ data Locomotive = Locomotive {
                               }
 
 data Route = Route Color Position Position
-
+  deriving(Show)
 
 data GameState = GameState {
                             getStations     :: [Station],
