@@ -1,9 +1,9 @@
-name:                my-project
+name:                minimetro
 version:             0.1.0.0
-github:              "iu-haskell-fall-2020/project-template"
+github:              "Haskell-Minimetro/minimetro"
 license:             BSD3
-author:              "Nikolai Kudasov"
-maintainer:          "n.kudasov@innopolis.ru"
+author:              "Haskell-Minimetro"
+maintainer:          "v.savchuk@innopolis.ru"
 copyright:           "2020 Innopolis University"
 
 extra-source-files:
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/iu-haskell-fall-2020/project-template#readme>
+description:         Please see the README on GitHub at <https://github.com/Haskell-Minimetro/minimetro#readme>
 
 custom-setup:
   dependencies:
