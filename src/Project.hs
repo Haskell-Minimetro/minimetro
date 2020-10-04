@@ -11,14 +11,13 @@ import Drawers
 import System.Random
 import Types
 import Data.List (find)
-import Data.Maybe (listToMaybe)
 import Config
 
 drawGameState :: GameState -> Picture
 drawGameState gameState =
   renderObject drawStation (getStations gameState)
     <> translated (-9) (-6) (lettering (pack $ show (getCurrentMode gameState)))
-    -- <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
+    <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
     <> drawControls gameState
     <> renderObject drawLocomotive (getLocomotives gameState)
     <> renderObject drawRoute (getRoutes gameState)
@@ -170,7 +169,6 @@ updateTime :: Double -> Double -> GameMode -> Double
 updateTime currentTime dt Play = currentTime + dt
 updateTime currentTime _ _ = currentTime
 
--- TODO: passanger setting on the train
 transferPassengersHelper :: [Locomotive] -> Station -> ([Locomotive], Station)
 transferPassengersHelper [] station = ([], station)
 transferPassengersHelper (locomotive:rest) station = (newLocomotive:nextLocomotives, nextStation)
@@ -196,8 +194,7 @@ transferPassengers trains (first:rest) = (updatedTrains, updatesStations)
 updateDynamic :: Double -> GameState -> GameState
 updateDynamic dt (GameState stations routes locomotives assets mode currentTime) = newState
   where
-    updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives -- Some filter on routes/locomotives
-    -- TODO: transferPassangersFromStation . transferPassangersToStation 
+    updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives
     newTime = updateTime currentTime dt mode
 
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
@@ -206,7 +203,6 @@ updateDynamic dt (GameState stations routes locomotives assets mode currentTime)
     newState = GameState transferredStations routes transferredLocomotives assets mode newTime
 
 
--- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
 updateGameState :: Event -> GameState -> GameState
 updateGameState (PointerPress p) state = handleClick p state
@@ -248,30 +244,57 @@ handleClick point state@(GameState stations routes locos assets (Construction co
     turnConstructionOff =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations newRoutes locos assets Play time
+        Just secondStation -> GameState stations newRoutes locos assets Play time
           where
-            newRoutes :: [Route]
-            -- TODO: remove color hardcode
             newRoutes = 
-              case (sameTargetStationRoutes) of
-                Nothing -> Route color (getStationPosition startStation) (getStationPosition x) : routes
-                Just _ -> Route color (getStationPosition x) (getStationPosition startStation) : routes
+              case createNewRoute routes color startStation secondStation of
+                Nothing -> routes
+                Just route -> route : routes
 
-            sameTargetStationRoutes :: Maybe Route
-            sameTargetStationRoutes = listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
+handleClick _ state = state
 
-handleClick _ (GameState stations routes locos assets mode time) = GameState stations routes locos assets mode time
+createNewRoute :: [Route] -> Color -> Station -> Station -> Maybe Route
+createNewRoute routes routeColor firstStation secondStation = newRoute
+  where
+    filteredRoutes = filter (\(Route color _ _ ) -> color == routeColor) routes
+
+    firstPos = getStationPosition firstStation
+    secondPos = getStationPosition secondStation
+    
+    routesIn posToCheck = filter (\(Route _ _ pos2) -> pos2 == posToCheck) filteredRoutes
+    routesOut posToCheck = filter (\(Route _ pos1 _) -> pos1 == posToCheck) filteredRoutes
+
+    routesInFirstPos = length (routesIn firstPos)
+    routesOutFirstPos = length (routesOut firstPos)
+    routesInSecondPos = length (routesIn secondPos)
+    routesOutSecondPos = length (routesOut secondPos)
+
+    sumFirstPos = routesInFirstPos + routesOutFirstPos
+    sumSecondPos = routesInSecondPos + routesOutSecondPos
+
+    newRoute
+      | firstPos == secondPos = Nothing -- First case, positions are the same - we can't do that
+      | sumFirstPos == 0 && sumSecondPos == 0 = Just (Route routeColor firstPos secondPos) -- Second case, both points have no routes, we just create new one
+      | sumFirstPos == 2 || sumSecondPos == 2 = Nothing -- Third case, at least one of the points have in and out, we can't create a new route
+
+      | sumFirstPos == 0 && routesInSecondPos == 1 = Just (Route routeColor secondPos firstPos)
+      | sumFirstPos == 0 && routesOutSecondPos == 1 = Just (Route routeColor firstPos secondPos)
+
+      | routesInFirstPos == 1 && (sumSecondPos == 0 || routesOutSecondPos == 1) = Just (Route routeColor firstPos secondPos)
+      | routesInFirstPos == 1 && routesInSecondPos == 1 = Nothing
+
+      | routesOutFirstPos == 1 && (sumSecondPos == 0 || routesInSecondPos == 1) = Just (Route routeColor secondPos firstPos)
+      | routesOutFirstPos == 1 && routesOutSecondPos == 1 = Nothing
+      
+      | otherwise = Nothing
 
 initialSystem :: GameState
 initialSystem =
   GameState
     [ Station Circle (3, 4) [] (mkStdGen 42),
-      --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
-      --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
-      --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
       Station Rectangle (2, -6) [] (mkStdGen 41),
       Station Triangle (-4, 2) [] (mkStdGen 40),
-      Station Triangle (4, 2) [] (mkStdGen 40)
+      Station Triangle (4, 2) [] (mkStdGen 39)
     ]
     [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
     [Locomotive [] Forward (Ready (3,4) brown)]

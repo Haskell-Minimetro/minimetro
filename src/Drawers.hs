@@ -75,7 +75,7 @@ renderObject func = pictures . map func
 
 
 drawRoute :: Route -> Picture
-drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positions) -- <> translated x y (colored red $ solidCircle 0.7)
+drawRoute (Route color station1 station2@(x, y)) = colored color (thickCurve 0.3 positions) <> translated x y (colored red $ solidCircle 0.7)
   where
     positions = [station1, station2]
 
