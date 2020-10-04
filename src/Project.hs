@@ -31,7 +31,7 @@ updateLocomotivePosition :: Double -> Locomotive -> Locomotive
 updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
   where
     newProgress = calculateProgress direction progress dt speed
-    speed = 0 -- TODO: setup speed
+    speed = 1 -- TODO: setup speed
 updateLocomotivePosition _dt locomotive = locomotive
 
 calculateProgress :: Direction -> Double -> Double -> Double -> Double
