@@ -297,21 +297,11 @@ createNewRoute routes routeColor firstStation secondStation = newRoute
 initialSystem :: GameState
 initialSystem =
   GameState
-<<<<<<< Updated upstream
     [ 
       Station Circle    (3, 4)  [] (Random.mkStdGen 42),
       Station Rectangle (2, -6) [] (Random.mkStdGen 41),
       Station Triangle  (-4, 2) [] (Random.mkStdGen 40),
       Station Triangle  (4, 2)  [] (Random.mkStdGen 39)
-=======
-    [ Station Circle    ( 3, 4) [] (Random.mkStdGen 42),
-      --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
-      --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
-      --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
-      Station Rectangle ( 2,-6) [] (Random.mkStdGen 41),
-      Station Triangle  (-4, 2) [] (Random.mkStdGen 40),
-      Station Triangle  ( 4, 2) [] (Random.mkStdGen 40)
->>>>>>> Stashed changes
     ]
     [Route CW.brown (3, 4) (2, -6), Route CW.brown (2, -6) (-4, 2)]
     [Locomotive [] Forward (Ready (3,4) CW.brown)]
