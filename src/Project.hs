@@ -202,6 +202,7 @@ handleClick point state@(GameState stations routes locos (Construction startStat
         Just x -> GameState stations newRoutes locos Play time
           where
             newRoutes :: [Route]
+            -- TODO: remove color hardcode
             newRoutes = 
               case (sameTargetStationRoutes) of
                 Nothing -> Route brown (getStationPosition startStation) (getStationPosition x) : routes
