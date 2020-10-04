@@ -11,6 +11,8 @@ maxPassengersOnTrain = 6
 lineColors :: [Color]
 lineColors = [brown, red, blue, green]
 
+initialAmountOfAssets :: Int
+initialAmountOfAssets = 2
 
 controls :: [Control]
 controls = 

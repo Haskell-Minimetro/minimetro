@@ -7,9 +7,6 @@ type Position = Point
 data AssetType = LineColor Color | Train | Wagon 
   deriving (Eq, Show)
 
-newtype IsUsed = IsUsed Bool
-data Asset = Asset AssetType IsUsed
-
 data Control = Control AssetType Position | Removal AssetType
 
 data Figure = TriangleFigure | SquareFigure | CircleFigure
@@ -51,7 +48,6 @@ data GameState = GameState {
                             getStations     :: [Station],
                             getRoutes       :: [Route],
                             getLocomotives  :: [Locomotive],
-                            getAssets       :: [Asset],
                             getCurrentMode  :: GameMode,
                             getCurrentTime  :: Double
                             }
