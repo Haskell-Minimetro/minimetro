@@ -13,36 +13,56 @@ import Types
 import Data.List (find)
 import Config
 
+-- | Main function that draw State of the Game
 drawGameState :: GameState -> Picture
 drawGameState gameState =
-  renderObject drawStation (getStations gameState)
-    <> drawControls gameState
-    <> renderObject drawLocomotive (getLocomotives gameState)
-    <> renderObject drawRoute (getRoutes gameState)
+  renderObject drawStation (getStations gameState) -- Render all stations
+    <> drawControls gameState -- Render all controls
+    <> renderObject drawLocomotive (getLocomotives gameState) -- Render all locomotives
+    <> renderObject drawRoute (getRoutes gameState) -- Render all routes
     <> backgroundImage
 
+-- | Updates locomotive position given timedelta and the locomotive itself
 updateLocomotivePosition :: Double -> Locomotive -> Locomotive
 updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
   where
-    newProgress = calculateProgress direction progress dt speed
-    speed = 1 -- TODO: setup speed
-updateLocomotivePosition _dt locomotive = locomotive
+    newProgress = calculateProgress direction progress dt locomotiveSpeed
+updateLocomotivePosition _dt locomotive = locomotive -- If the locomotive isn't 'OnRoute' we don't update its position
 
-calculateProgress :: Direction -> Double -> Double -> Double -> Double
+-- | Calculate the progress on the route of the locomotive
+calculateProgress ::
+  Direction -- Direction of the locomotive
+  -> Double -- Current progress of the locomotive
+  -> Double -- Time delta
+  -> Double -- Speed of the locomotive
+  -> Double -- New progress towards the station
 calculateProgress Forward progress dt speed = progress + dt * speed
 calculateProgress Backward progress dt speed = progress - dt * speed
 
+-- | Inverses the direction
 inverseDirection :: Direction -> Direction
 inverseDirection Backward = Forward
 inverseDirection Forward = Backward
 
-withinErrorPosition :: Position -> Position -> Double -> Bool
+-- | Checks if the given position is within some error wrt another position
+withinErrorPosition ::
+  Position -- First position
+  -> Position  -- Second position
+  -> Double -- Epsilon, within which error do we consider
+  -> Bool
 withinErrorPosition (x, y) (x2, y2) epsilon = withinError x x2 epsilon && withinError y y2 epsilon
 
+-- | Check if given value is within some error wrt another value
 withinError :: Double -> Double -> Double -> Bool
 withinError a b epsilon = abs (a - b) < epsilon
 
-withTimePassing :: forall world. Double -> Double -> (Double -> world -> world) -> (Double -> world -> world)
+-- | Updates the function so it only runs if some amount of time has passed
+withTimePassing ::
+  forall world.
+  Double -- Current Time
+  -> Double -- Amount of seconds that needs to pass 
+  -> (Double -> world -> world) -- The function that will be called every 'x' seconds
+  -> (Double -> world -> world) -- Updated function
 withTimePassing currentTime threshold func
   | currentTime `mod'` threshold < 0.05 = func
   | otherwise = const id
