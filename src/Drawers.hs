@@ -2,16 +2,7 @@
 module Drawers where 
 import Types
 import CodeWorld
--- import CodeWorld.Image
 import Config
--- import Data.Text (pack)
--- import qualified Data.Text as T
-
--- trainEmoji :: Picture
--- trainEmoji = image "train" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/train_1f686.png" 16 16
-
--- wagonEmoji :: Picture
--- wagonEmoji = image "wagon" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/railway-car_1f683.png" 16 16
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -75,7 +66,7 @@ renderObject func = pictures . map func
 
 
 drawRoute :: Route -> Picture
-drawRoute (Route color station1 station2@(x, y)) = colored color (thickCurve 0.3 positions) <> translated x y (colored red $ solidCircle 0.7)
+drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positions) -- <> translated x y (colored red $ solidCircle 0.7)
   where
     positions = [station1, station2]
 
