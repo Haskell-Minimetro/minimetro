@@ -7,7 +7,7 @@ module Project where
 import ActivityOfEnhancements
 import CodeWorld
 import Data.Fixed
-import Data.Maybe (isNothing, listToMaybe)
+import Data.Maybe (listToMaybe)
 import Data.Text (pack)
 import Drawers
 import System.Random
@@ -121,27 +121,27 @@ getStationByCoord :: Point -> GameState -> Maybe Station
 getStationByCoord p state = myStations
   where
     myStations :: Maybe Station
-    myStations = listToMaybe $ (filter (\a -> (withinErrorPosition (getStationPosition a) p 1)) (getStations state))
+    myStations = listToMaybe $ filter (\a -> withinErrorPosition (getStationPosition a) p 1) (getStations state)
 
 handleClick :: Point -> GameState -> GameState
 handleClick point state@(GameState stations routes locos Play time) = turnConstructionOn
   where
     turnConstructionOn =
-      case (getStationByCoord point state) of
+      case getStationByCoord point state of
         Nothing -> state
-        Just x -> (GameState stations routes locos (Construction (x)) time)
+        Just x -> GameState stations routes locos (Construction (x)) time
 
 handleClick point state@(GameState stations routes locos (Construction startStation) time) = turnConstructionOff
   where
     turnConstructionOff =
-      case (getStationByCoord point state) of
+      case getStationByCoord point state of
         Nothing -> state
-        Just x -> (GameState stations newRoutes locos Play time)
+        Just x -> GameState stations newRoutes locos Play time
           where
             newRoutes :: [Route]
-            newRoutes = [Route brown (getStationPosition startStation) (getStationPosition x)] ++ routes
+            newRoutes = Route brown (getStationPosition startStation) (getStationPosition x) : routes
 
-handleClick _ (GameState stations routes locos mode time) = (GameState stations routes locos mode time)
+handleClick _ (GameState stations routes locos mode time) = GameState stations routes locos mode time
 
 initialSystem :: GameState
 initialSystem =
