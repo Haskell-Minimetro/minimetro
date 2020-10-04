@@ -24,7 +24,6 @@ drawPassanger (Passenger Triangle) = scaled 0.2 0.2 (drawFigure TriangleFigure)
 drawPassanger (Passenger Rectangle) = scaled 0.2 0.2 (drawFigure SquareFigure)
 drawPassanger (Passenger Circle) = scaled 0.2 0.2 (drawFigure CircleFigure)
 
--- TODO: fix this triangle draw wrong
 drawFigure :: Figure -> Picture
 drawFigure TriangleFigure = triangle
   where
@@ -40,7 +39,6 @@ drawCurrentDate :: Double -> Picture
 drawCurrentDate _time = blank
 
 
-
 drawStation :: Station -> Picture
 drawStation (Station stationType (x, y) passangers _) 
   = translated x y (drawStationType stationType) <> drawPassengersOnStation (x, y) passangers
@@ -53,7 +51,7 @@ drawInARow (first:rest) margin drawer =
   <> translated margin 0 (drawInARow rest margin drawer)
 
 drawPassengersOnStation :: Position -> [Passenger] -> Picture
-drawPassengersOnStation (x, y) passengers = translated (x+0.5) (y+0.5) (passes passengers)
+drawPassengersOnStation (x, y) passengers = translated (x+0.6) (y+0.6) (passes passengers)
   where
     passes :: [Passenger] -> Picture
     passes [] = blank
@@ -93,6 +91,11 @@ getAngle :: Position -> Position -> Double
 getAngle (x1, y1) (x2, y2) = atan ((y1 - y2) / (x1 - x2))
 
 
+drawRemoval :: Picture
+drawRemoval = smallRectangle <> rotated (pi/2) smallRectangle <> colored gray (solidCircle 0.15) <> colored black (solidCircle 0.20)
+  where
+    smallRectangle = rotated (pi/4) (colored black (solidRectangle 0.2 0.05))
+
 drawPassengersOnTrain :: [Passenger] -> Picture
 drawPassengersOnTrain [] = blank
 drawPassengersOnTrain passenger = drawInARow (take 2 passenger) 0.25 drawPassanger <> translated 0 0.25 (drawPassengersOnTrain (drop 2 passenger))
@@ -104,14 +107,16 @@ drawAssetType :: AssetType -> Picture
 drawAssetType (LineColor backgroundColor) 
   = colored backgroundColor (solidCircle 0.65)
   <> colored (dark backgroundColor) (solidCircle 0.75)
-drawAssetType Train = lettering "T" <> defaultControlBackground
-drawAssetType Wagon = lettering "W" <> defaultControlBackground
+  <> translated 0.75 0.75 drawRemoval
+drawAssetType Train = lettering "T" <> defaultControlBackground <> translated 0.75 0.75 drawRemoval
+drawAssetType Wagon = lettering "W" <> defaultControlBackground <> translated 0.75 0.75 drawRemoval
 
 drawControlsRecursion :: [Control] -> Bool -> Picture
 drawControlsRecursion [] _ = blank
 drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
   = translated x y (drawAssetType assetType)
   <> drawControlsRecursion rest isEnabled
+drawControlsRecursion((Removal _):rest) isEnabled = drawControlsRecursion rest isEnabled
 
 drawControls :: GameState -> Picture
 drawControls (GameState _ _ _ assets _mode currentTime) 

@@ -10,7 +10,7 @@ data AssetType = LineColor Color | Train | Wagon
 newtype IsUsed = IsUsed Bool
 data Asset = Asset AssetType IsUsed
 
-data Control = Control AssetType Position
+data Control = Control AssetType Position | Removal AssetType
 
 data Figure = TriangleFigure | SquareFigure | CircleFigure
 data StationType = Triangle | Rectangle | Circle
@@ -31,13 +31,13 @@ data Station = Station {
 data Direction = Forward | Backward
   deriving (Eq, Show)
 
-data StationStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
+data LocomotiveStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
   deriving (Show)
   
 data Locomotive = Locomotive {
                               getLocomotivePassengers      :: [Passenger],
                               getLocomotiveDirection       :: Direction,
-                              getLocomotiveStatus          :: StationStatus
+                              getLocomotiveStatus          :: LocomotiveStatus
                               }
 
 data Route = Route Color Position Position
