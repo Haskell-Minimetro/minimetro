@@ -3,7 +3,6 @@
 
 module Project where
 
--- TODO: don't forget to remove this
 import ActivityOfEnhancements
 import CodeWorld
 import Drawers
@@ -14,6 +13,9 @@ import Types
 maxPassangers :: Int
 maxPassangers = 30
 
+maxPassengersOnTrain :: Int
+maxPassengersOnTrain = 6
+
 drawGameState :: GameState -> Picture
 drawGameState gameState =
   renderObject drawStation (getStations gameState)
@@ -22,10 +24,11 @@ drawGameState gameState =
     <> backgroundImage
 
 updateLocomotivePosition :: Double -> Locomotive -> Locomotive
-updateLocomotivePosition dt (Locomotive route passengers direction progress) = Locomotive route passengers direction newProgress
+updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
   where
     newProgress = calculateProgress direction progress dt speed
     speed = 1 -- TODO: setup speed
+updateLocomotivePosition _dt locomotive = locomotive
 
 calculateProgress :: Direction -> Double -> Double -> Double -> Double
 calculateProgress Forward progress dt speed = progress + dt * speed
@@ -47,27 +50,28 @@ withinErrorPosition (x, y) (x2, y2) epsilon = withinError x x2 epsilon && within
 withinError :: Double -> Double -> Double -> Bool
 withinError a b epsilon = abs (a - b) < epsilon
 
--- TODO: fix, with some speed doesn't transfer
--- TODO: get better check for transfer as I had to add 0.9 and 0.1 as starting pos to stop wrong transfers (maybe there is a need for better architecture)
-transferLocomotive :: [Route] -> Locomotive -> Locomotive
-transferLocomotive [] locomotive@(Locomotive route passengers direction progress)
-  | progress > 1 && direction == Forward = Locomotive route passengers Backward 1.0
-  | progress < 0 && direction == Backward = Locomotive route passengers Forward 0
-  | otherwise = locomotive
-transferLocomotive (first : rest) locomotive
-  | color1 == color2 && canGo && (routePos1 /= pos1) && (routePos2 /= pos2) = newLocomotive
-  | otherwise = transferLocomotive rest locomotive
-  where
-    (canGo, direction) = checkTransfer currentPosition first
+-- -- TODO: fix, with some speed doesn't transfer
+-- -- TODO: get better check for transfer as I had to add 0.9 and 0.1 as starting pos to stop wrong transfers (maybe there is a need for better architecture)
+-- transferLocomotive :: [Route] -> Locomotive -> Locomotive
+-- transferLocomotive [] locomotive@(Locomotive passengers direction (OnRoute route progress))
+--   | progress > 1 && direction == Forward = Locomotive passengers Backward (OnRoute route 1.0)
+--   | progress < 0 && direction == Backward = Locomotive passengers Forward (OnRoute route 0.0)
+--   | otherwise = locomotive
+-- transferLocomotive (first : rest) locomotive
+--   | color1 == color2 && canGo && (routePos1 /= pos1) && (routePos2 /= pos2) = newLocomotive
+--   | otherwise = transferLocomotive rest locomotive
+--   where
+--     (canGo, direction) = checkTransfer currentPosition first
 
-    whereToStart Backward = 0.9
-    whereToStart Forward = 0.1
+--     whereToStart Backward = 0.9
+--     whereToStart Forward = 0.1
 
-    newLocomotive = Locomotive first (getLocomotivePassengers locomotive) direction (whereToStart direction)
+--     newLocomotive = Locomotive (getLocomotivePassengers locomotive) direction (OnRoute first (whereToStart direction))
 
-    (Route color1 routePos1 routePos2) = first
-    (Route color2 pos1 pos2) = getLocomotiveRoute locomotive
-    currentPosition = getTrainPositionWithProgress (getLocomotivePosition locomotive) pos1 pos2
+--     (Route color1 routePos1 routePos2) = first
+--     (OnRoute (Route color2 pos1 pos2) progress) = getLocomotiveStatus locomotive
+--     currentPosition = getTrainPositionWithProgress progress pos1 pos2
+-- transferLocomotive _ locomotive = locomotive
 
 withTimePassing :: forall world. Double -> Double -> (Double -> world -> world) -> (Double -> world -> world)
 withTimePassing currentTime threshold func
@@ -86,6 +90,52 @@ getRandomPassenger 0 = Passenger Triangle
 getRandomPassenger 1 = Passenger Rectangle
 getRandomPassenger _ = Passenger Circle
 
+-- TODO: the state of the station may change for transfers, but not for now
+transferPassangersToStation :: Locomotive -> Station -> (Locomotive, Station)
+transferPassangersToStation (Locomotive passengers direction (TransferTo position color)) station = (updatedLocomotive, updatedStation)
+  where
+    trainPassangers = map Passenger (filter (==stationType) (map (\(Passenger x) -> x) passengers))
+    stationType = getStationType station
+
+    updatedLocomotive = Locomotive trainPassangers direction (TransferFrom position color)
+    updatedStation = station
+transferPassangersToStation locomotive station = (locomotive, station)
+
+transferPassangersToLocomotive :: Locomotive -> Station -> (Locomotive, Station)
+transferPassangersToLocomotive (Locomotive trainPassangers direction (TransferFrom position color)) station = (updatedLocomotive, updatedStation)
+  where
+    stationPassengers = getStationPassengers station
+    maxToTransfer = 6 - length trainPassangers
+
+    newTrainPassangers = trainPassangers ++ take maxToTransfer stationPassengers
+    newStationsPassengers = drop maxToTransfer stationPassengers
+
+    updatedLocomotive = Locomotive newTrainPassangers direction (Ready position color)
+    updatedStation = Station (getStationType station) (getStationPosition station) newStationsPassengers (getPassengerGen station)
+transferPassangersToLocomotive locomotive station = (locomotive, station)
+
+transferLocomotive :: [Route] -> Locomotive -> Locomotive
+transferLocomotive [] locomotive@(Locomotive _ _ (Ready _ _)) = locomotive -- Go backwards
+transferLocomotive (first: rest) locomotive@(Locomotive passagners direction (Ready pos color1))
+  | color1 == color2 = newLocomotive
+  | otherwise = transferLocomotive rest locomotive
+    where
+      newLocomotive = Locomotive (getLocomotivePassengers locomotive) direction (OnRoute first (whereToStart direction))
+    -- | color1 == color2 && canGo && (routePos1 /= pos1) && (routePos2 /= pos2) = newLocomotive
+    -- | otherwise = transferLocomotive rest locomotive
+    -- where
+    --   (canGo, direction) = checkTransfer currentPosition first
+
+    --   whereToStart Backward = 0.9
+    --   whereToStart Forward = 0.1
+
+    --   newLocomotive = Locomotive (getLocomotivePassengers locomotive) direction (OnRoute first (whereToStart direction))
+
+    --   (Route color1 routePos1 routePos2) = first
+    --   (OnRoute (Route color2 pos1 pos2) progress) = getLocomotiveStatus locomotive
+    --   currentPosition = getTrainPositionWithProgress progress pos1 pos2
+
+
 -- TODO: passanger setting on the train
 updateDynamic :: Double -> GameState -> GameState
 updateDynamic dt state = newState
@@ -93,7 +143,8 @@ updateDynamic dt state = newState
     stations = getStations state
     routes = getRoutes state
     locomotives = getLocomotives state
-    updatedLocomotives = map (transferLocomotive routes . updateLocomotivePosition dt) locomotives -- . filter (\(Locomotive _ _ _ progress) -> withinError progress 1.0 1e-1 || withinError progress 0.0 1e-1)
+    updatedLocomotives = map ( updateLocomotivePosition dt . transferLocomotive routes) locomotives -- . filter (\(Locomotive _ _ _ progress) -> withinError progress 1.0 1e-1 || withinError progress 0.0 1e-1)
+    --  transferPassangersFromStation . transferPassangersToStation 
     newTime = dt + currentTime
     currentTime = getCurrentTime state
 
@@ -120,7 +171,7 @@ initialSystem = GameState [
     Station Triangle (-4, 2) [] (mkStdGen 40)
   ]
   [Route brown (3,4) (2, -6), Route brown (2, -6) (-4, 2)]
-  [Locomotive (Route brown (3,4) (2, -6)) [] Forward 0.0]
+  [Locomotive [] Forward (Ready (3,4) brown)]
   0
 
 isGameOver :: GameState -> Bool

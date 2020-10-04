@@ -1,7 +1,6 @@
 module Drawers where 
 import  Types
 import CodeWorld
-import Data.Text (pack)
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -71,19 +70,18 @@ drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positi
 
 -- TODO: remove debug stuff
 drawLocomotive :: Locomotive -> Picture
-drawLocomotive locomotive =
-  translated x y (rotated (- angle) (passengers <> locomotiveBase))
-    <> translated (-9) (-9) (lettering (pack $ show progress))
-    <> translated (-9) (-8) (lettering (pack $ show $ getLocomotiveDirection locomotive))
-    <> translated (-9) (-7) (lettering (pack $ show pos1))
+drawLocomotive (Locomotive trainPassangers _ others) = drawing
   where
-    angle = pi / 2 - getAngle pos1 pos2
-    progress = getLocomotivePosition locomotive
-    (x, y) = getTrainPositionWithProgress progress pos1 pos2
-
-    (Route locomotiveColor pos1 pos2) = getLocomotiveRoute locomotive
-    locomotiveBase = colored (light locomotiveColor) (solidRectangle 0.66 1)
-    passengers = translated (-0.13) (-0.25) (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain (getLocomotivePassengers locomotive)))
+    drawing =
+      case others of 
+        OnRoute (Route color pos1 pos2) progress -> baseDrawing (getTrainPositionWithProgress progress pos1 pos2) (-(pi / 2 - getAngle pos1 pos2)) color
+        TransferTo pos color -> baseDrawing pos 0 color
+        TransferFrom pos color -> baseDrawing pos 0 color
+        Ready pos color -> baseDrawing pos 0 color
+    baseDrawing (x, y) rotation color =  translated x y (rotated rotation (passengers color <> locomotiveBase color))
+    locomotiveBase locomotiveColor = colored (light locomotiveColor) (solidRectangle 0.66 1)
+    passengers locomotiveColor = translated (-0.13) (-0.25) (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
+      
 
 getTrainPositionWithProgress :: Double -> Position -> Position -> Position
 getTrainPositionWithProgress percent (x1, y1) (x2, y2) = (x1 * (1 - percent) + x2 * percent, y1 * (1 - percent) + y2 * percent)
