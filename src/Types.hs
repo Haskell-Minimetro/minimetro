@@ -43,7 +43,7 @@ data Locomotive = Locomotive {
 data Route = Route Color Position Position
   deriving (Show)
 
-data GameMode = Play | Construction Color (Maybe Station) | GameOver
+data GameMode = Play | Repopulation | Construction Color (Maybe Station) 
   deriving (Show)
 
 

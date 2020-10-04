@@ -97,7 +97,6 @@ drawPassengersOnTrain :: [Passenger] -> Picture
 drawPassengersOnTrain [] = blank
 drawPassengersOnTrain passenger = drawInARow (take 2 passenger) 0.25 drawPassanger <> translated 0 0.25 (drawPassengersOnTrain (drop 2 passenger))
 
-
 defaultControlBackground :: Picture
 defaultControlBackground = colored gray (solidCircle 0.65) <> colored (dark gray) (solidCircle 0.75)
 
@@ -105,8 +104,8 @@ drawAssetType :: AssetType -> Picture
 drawAssetType (LineColor backgroundColor) 
   = colored backgroundColor (solidCircle 0.65)
   <> colored (dark backgroundColor) (solidCircle 0.75)
-drawAssetType Train = lettering "🚅" <> defaultControlBackground
-drawAssetType Wagon = lettering "🚟" <> defaultControlBackground
+drawAssetType Train = lettering "T" <> defaultControlBackground
+drawAssetType Wagon = lettering "W" <> defaultControlBackground
 
 drawControlsRecursion :: [Control] -> Bool -> Picture
 drawControlsRecursion [] _ = blank
@@ -117,8 +116,6 @@ drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
 drawControls :: GameState -> Picture
 drawControls (GameState _ _ _ assets _mode currentTime) 
   = drawControlsRecursion controls isEnabled
-  -- = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
-  -- <> lettering mode
   where
     week = floor currentTime `div` 7
     isEnabled = week > length assets - 2 

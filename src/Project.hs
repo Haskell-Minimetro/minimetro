@@ -223,16 +223,27 @@ getControlByCoord point = foundControl
 
 handleClick :: Point -> GameState -> GameState
 handleClick point state@(GameState stations routes locos assets Play time) 
-  = if isEnabled then  withColorPicked else state
+  = if isEnabled then withColorPicked else state
     where
       week = floor (time / 10)
       isEnabled = week > length assets - 3
       withColorPicked =
         case getControlByCoord point of
           Nothing -> state
-          Just (Control Train _) -> state
+          Just (Control Train _) -> GameState stations routes locos assets Repopulation time
           Just (Control Wagon _) -> state
           Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+
+handleClick point state@(GameState stations routes locos assets Repopulation time)
+  = case getControlByCoord point of 
+      Nothing -> state
+      Just (Control Train _) -> state
+      Just (Control Wagon _) -> state
+      Just (Control (LineColor trainColor) _ ) -> case chosenRoute of 
+          Nothing -> state
+          Just (Route _ startPosition _) -> GameState stations routes (Locomotive [] Forward (Ready startPosition trainColor):locos) assets Play time
+        where
+          chosenRoute = find (\(Route color _ _ ) -> color == trainColor) routes
 
 handleClick point state@(GameState stations routes locos assets (Construction color Nothing) time) = turnConstructionOn
   where
@@ -249,13 +260,12 @@ handleClick point state@(GameState stations routes locos assets (Construction co
         Nothing -> state
         Just secondStation -> GameState stations newRoutes locos newAssets Play time
           where
-            newAssets = Asset (LineColor color) (IsUsed True) : assets
+            newAssets = assets
+            -- newAssets = Asset (LineColor color) (IsUsed True) : assets -- Fix this!
             newRoutes = 
               case createNewRoute routes color startStation secondStation of
                 Nothing -> routes
                 Just route -> route : routes
-
-handleClick _ state = state
 
 createNewRoute :: [Route] -> Color -> Station -> Station -> Maybe Route
 createNewRoute routes routeColor firstStation secondStation = newRoute
@@ -302,7 +312,7 @@ initialSystem =
     ]
     [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
     [Locomotive [] Forward (Ready (3,4) brown)]
-    [Asset (LineColor brown) (IsUsed True), Asset Train (IsUsed True)]
+    [] -- [Asset (LineColor brown) (IsUsed True), Asset Train (IsUsed True)]
     Play
     0
 
