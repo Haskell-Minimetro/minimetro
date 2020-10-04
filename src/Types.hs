@@ -4,13 +4,17 @@ import System.Random
 
 type Position = Point
 data Asset = Bridge | Train | Wagon
+  deriving (Eq, Show)
 data Object = Object Asset Position
+  deriving (Eq, Show)
 type ObjectDrawer = Object -> Picture
 
 data Figure = TriangleFigure | SquareFigure | CircleFigure
 data StationType = Triangle | Rectangle | Circle
-  deriving (Eq)
+  deriving (Eq, Show)
+
 data Passenger = Passenger StationType
+  deriving (Eq, Show)
 
 data Station = Station {
                         getStationType               :: StationType,
@@ -18,6 +22,7 @@ data Station = Station {
                         getStationPassengers         :: [Passenger],
                         getPassengerGen              :: StdGen 
                         }
+  deriving (Show)
 
 
 data Direction = Forward | Backward
@@ -32,11 +37,14 @@ data Locomotive = Locomotive {
                               }
 
 data Route = Route Color Position Position
-  deriving(Show)
+  deriving (Show)
+data GameMode = Play | Construction Station | GameOver
+  deriving (Show)
 
 data GameState = GameState {
                             getStations     :: [Station],
                             getRoutes       :: [Route],
                             getLocomotives  :: [Locomotive],
+                            getCurrentMode  :: GameMode,
                             getCurrentTime  :: Double
                             }
