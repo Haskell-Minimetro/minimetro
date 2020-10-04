@@ -6,7 +6,7 @@ module Project where
 import ActivityOfEnhancements
 import CodeWorld
 import Data.Fixed
-import Data.Text (pack)
+-- import Data.Text (pack)
 import Drawers
 import System.Random
 import Types
@@ -16,8 +16,6 @@ import Config
 drawGameState :: GameState -> Picture
 drawGameState gameState =
   renderObject drawStation (getStations gameState)
-    <> translated (-9) (-6) (lettering (pack $ show (getCurrentMode gameState)))
-    <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
     <> drawControls gameState
     <> renderObject drawLocomotive (getLocomotives gameState)
     <> renderObject drawRoute (getRoutes gameState)
@@ -192,7 +190,7 @@ transferPassengers trains (first:rest) = (updatedTrains, updatesStations)
     updatesStations = newStation : nextStations
 
 updateDynamic :: Double -> GameState -> GameState
-updateDynamic dt (GameState stations routes locomotives assets mode currentTime) = newState
+updateDynamic dt (GameState stations routes locomotives mode currentTime) = newState
   where
     updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives
     newTime = updateTime currentTime dt mode
@@ -200,7 +198,7 @@ updateDynamic dt (GameState stations routes locomotives assets mode currentTime)
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
 
     (transferredLocomotives, transferredStations) = transferPassengers updatedLocomotives updatedStations
-    newState = GameState transferredStations routes transferredLocomotives assets mode newTime
+    newState = GameState transferredStations routes transferredLocomotives mode newTime
 
 updateGameState :: Event -> GameState -> GameState
 updateGameState (PointerPress p) state = handleClick p state
@@ -232,58 +230,60 @@ getLocomotiveColor (Locomotive _ _ (TransferFrom _ trainColor)) = trainColor
 getLocomotiveColor (Locomotive _ _ (OnRoute (Route trainColor _ _) _)) = trainColor
 
 removeAssetType :: AssetType -> GameState -> GameState
-removeAssetType (LineColor routeColor) (GameState stations routes locos assets mode time) = newState
+removeAssetType (LineColor routeColor) (GameState stations routes locos mode time) = newState
   where
-    newState = GameState stations newRoutes newLocos assets mode time -- TODO: assets here
+    newState = GameState stations newRoutes newLocos mode time
     newRoutes = filter (\(Route color _ _) -> color /= routeColor) routes
     newLocos = filter (\locomotive -> getLocomotiveColor locomotive /= routeColor) locos
 
-removeAssetType Train (GameState stations routes _ assets mode time) = GameState stations routes [] assets mode time
+removeAssetType Train (GameState stations routes _ mode time) = GameState stations routes [] mode time
 removeAssetType _ state = state
 
 handleClick :: Point -> GameState -> GameState
-handleClick point state@(GameState stations routes locos assets Play time) 
-  = if isEnabled then withColorPicked else state
+handleClick point state@(GameState stations routes locos Play time) 
+  = withColorPicked
     where
-      week = floor (time / 10)
-      isEnabled = week > length assets - 3
+      outOfAssets = getAmountOfAssets time <= getAmountOfAssetsUsed state
+
+      colors = getUniqueLinesColors routes
+      isAvailable asset = isAssetAvailable outOfAssets asset colors 
+
       withColorPicked =
         case getControlByCoord point of
           Nothing -> state
-          Just (Control Train _) -> GameState stations routes locos assets Repopulation time
+          Just (Control Train _) ->
+            if isAvailable Train then GameState stations routes locos Repopulation time else state
           Just (Control Wagon _) -> state
-          Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+          Just (Control (LineColor color) _) ->
+            if isAvailable (LineColor color) then GameState stations routes locos (Construction color Nothing) time else state
           Just (Removal assetType) -> removeAssetType assetType state
 
-handleClick point state@(GameState stations routes locos assets Repopulation time)
+handleClick point state@(GameState stations routes locos Repopulation time)
   = case getControlByCoord point of 
       Nothing -> state
       Just (Removal _) -> state
       Just (Control Train _) -> state
       Just (Control Wagon _) -> state
       Just (Control (LineColor trainColor) _ ) -> case chosenRoute of 
-          Nothing -> state
-          Just (Route _ startPosition _) -> GameState stations routes (Locomotive [] Forward (Ready startPosition trainColor):locos) assets Play time
+          Nothing -> GameState stations routes locos Play time
+          Just (Route _ startPosition _) -> GameState stations routes (Locomotive [] Forward (Ready startPosition trainColor):locos) Play time
         where
           chosenRoute = find (\(Route color _ _ ) -> color == trainColor) routes
 
-handleClick point state@(GameState stations routes locos assets (Construction color Nothing) time) = turnConstructionOn
+handleClick point state@(GameState stations routes locos (Construction color Nothing) time) = turnConstructionOn
   where
     turnConstructionOn =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations routes locos assets (Construction color (Just x)) time
+        Just x -> GameState stations routes locos (Construction color (Just x)) time
 
-
-handleClick point state@(GameState stations routes locos assets (Construction color (Just startStation)) time) = turnConstructionOff
+handleClick point state@(GameState stations routes locos (Construction color (Just startStation)) time) = turnConstructionOff
   where
     turnConstructionOff =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just secondStation -> GameState stations newRoutes locos newAssets Play time
+        Just secondStation -> GameState stations newRoutes locos Play time
           where
-            newAssets = assets
-            -- newAssets = Asset (LineColor color) (IsUsed True) : assets -- Fix this!
             newRoutes = 
               case createNewRoute routes color startStation secondStation of
                 Nothing -> routes
@@ -329,12 +329,13 @@ initialSystem =
   GameState
     [ Station Circle (3, 4) [] (mkStdGen 42),
       Station Rectangle (2, -6) [] (mkStdGen 41),
-      Station Triangle (-4, 2) [] (mkStdGen 40),
-      Station Triangle (4, 2) [] (mkStdGen 39)
+      Station Triangle (-6, 2) [] (mkStdGen 40),
+      Station Triangle (4, 2) [] (mkStdGen 39),
+      Station Rectangle (0, 8) [] (mkStdGen 38),
+      Station Circle (-4, -4) [] (mkStdGen 37)
     ]
-    [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
-    [Locomotive [] Forward (Ready (3,4) brown)]
-    [] -- [Asset (LineColor brown) (IsUsed True), Asset Train (IsUsed True)]
+    []
+    []
     Play
     0
 
@@ -357,11 +358,8 @@ withGameOver isOver originalActivityOf userWorld userHandler userDrawer =
 
     updatedDrawer :: world -> Picture
     updatedDrawer state
-      | isOver state = translated 9 9 (lettering "Game Over") <> userDrawer state
+      | isOver state = translated 9.6 9.2 (colored red (lettering "Game Over")) <> userDrawer state
       | otherwise = userDrawer state
 
-run2 :: IO ()
-run2 = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState
-
 run :: IO ()
-run = debugActivityOf initialSystem updateGameState drawGameState
+run = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState

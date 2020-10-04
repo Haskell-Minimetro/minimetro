@@ -3,6 +3,7 @@ module Drawers where
 import Types
 import CodeWorld
 import Config
+import Data.Text (pack)
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -64,14 +65,12 @@ renderObject func = pictures . map func
 
 
 drawRoute :: Route -> Picture
-drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positions) -- <> translated x y (colored red $ solidCircle 0.7)
+drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positions)
   where
     positions = [station1, station2]
 
 drawLocomotive :: Locomotive -> Picture
 drawLocomotive (Locomotive trainPassangers _direction others) = drawing
-  -- <> translated (-9) (-8) (lettering (pack $ show  direction))
-  -- <> translated (-9) (-9) (lettering (pack $ show  others))
   where
     drawing =
       case others of 
@@ -107,20 +106,68 @@ drawAssetType :: AssetType -> Picture
 drawAssetType (LineColor backgroundColor) 
   = colored backgroundColor (solidCircle 0.65)
   <> colored (dark backgroundColor) (solidCircle 0.75)
-  <> translated 0.75 0.75 drawRemoval
-drawAssetType Train = lettering "T" <> defaultControlBackground <> translated 0.75 0.75 drawRemoval
-drawAssetType Wagon = lettering "W" <> defaultControlBackground <> translated 0.75 0.75 drawRemoval
+drawAssetType Train = lettering "T" <> defaultControlBackground
+drawAssetType Wagon = lettering "W" <> defaultControlBackground
 
-drawControlsRecursion :: [Control] -> Bool -> Picture
-drawControlsRecursion [] _ = blank
-drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
-  = translated x y (drawAssetType assetType)
-  <> drawControlsRecursion rest isEnabled
-drawControlsRecursion((Removal _):rest) isEnabled = drawControlsRecursion rest isEnabled
+getUnique :: Eq a => [a] -> [a]
+getUnique = helper [] 
+  where
+    helper uniqueList [] = uniqueList
+    helper uniqueList (first:rest)
+      | first `elem` uniqueList = helper uniqueList rest
+      | otherwise = helper (first:uniqueList) rest
+
+getUniqueLinesColors :: [Route] -> [Color]
+getUniqueLinesColors routes = getUnique (map (\(Route color _ _)->color) routes)
+
+amountOfLinesUsed :: GameState -> Int
+amountOfLinesUsed state = length (getUniqueLinesColors (getRoutes state))
+
+amountOfTrainsUsed :: GameState -> Int
+amountOfTrainsUsed state = length (getLocomotives state)
+
+getAmountOfAssetsUsed :: GameState -> Int
+getAmountOfAssetsUsed state = amountOfLinesUsed state + amountOfTrainsUsed state
+
+getCurrentWeek :: Double -> Int
+getCurrentWeek currentTime = floor currentTime `div` 7
+
+getAmountOfAssets :: Double -> Int
+getAmountOfAssets = (+ initialAmountOfAssets) . getCurrentWeek
+
+drawMode :: GameMode -> Picture
+drawMode Play = lettering "Click below to start adding trains or lines"
+drawMode Repopulation = lettering "Choose color line where to place the train"
+drawMode (Construction _ (Just _)) = lettering "Choose second station"
+drawMode (Construction _ Nothing) = lettering "Choose first station"
+
+isAssetAvailable :: Bool -> AssetType -> [Color] -> Bool
+isAssetAvailable False _ _ = True
+isAssetAvailable _ (LineColor color) colors = color `elem` colors
+isAssetAvailable True _ _ = False
+
+drawControlsRecursion :: [Control] -> [Color] -> Bool -> Picture
+drawControlsRecursion [] _ _ = blank
+drawControlsRecursion ((Control assetType (x, y)):rest) colors outOfAssets
+  = translated x y (resultingPicture <> translated 0.75 0.75 drawRemoval)
+  <> drawControlsRecursion rest colors outOfAssets
+  where
+    
+    resultingPicture = scaledIfNotAvailable isAvailable (drawAssetType assetType)
+    isAvailable = isAssetAvailable outOfAssets assetType colors
+
+    scaledIfNotAvailable True picture = picture
+    scaledIfNotAvailable False picture = scaled 0.5 0.5 picture
+
+drawControlsRecursion((Removal _):rest) colors outOfAssets = drawControlsRecursion rest colors outOfAssets
 
 drawControls :: GameState -> Picture
-drawControls (GameState _ _ _ assets _mode currentTime) 
-  = drawControlsRecursion controls isEnabled
+drawControls state@(GameState _ routes _ mode currentTime) 
+  = drawControlsRecursion controls colors outOfAssets
+    <> translated 10 6 (scaled 0.8 0.8 (translated 0 1(lettering $ pack $ ("Amount of assets used: "++) $ show $ getAmountOfAssetsUsed state)
+    <> translated 0 2 (lettering $ pack $ ("Amount of assets available : " ++) $ show assets)
+    <> translated 0 3 (drawMode mode)))
   where
-    week = floor currentTime `div` 7
-    isEnabled = week > length assets - 2 
+    assets = getAmountOfAssets currentTime
+    outOfAssets = getAmountOfAssetsUsed state >= assets
+    colors = getUniqueLinesColors routes
