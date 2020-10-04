@@ -195,7 +195,7 @@ updateDynamic dt (GameState stations routes locomotives mode currentTime) = newS
     updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives
     newTime = updateTime currentTime dt mode
 
-    updatedStations = map (withTimePassing currentTime 0.5 updateStation dt) stations
+    updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
 
     (transferredLocomotives, transferredStations) = transferPassengers updatedLocomotives updatedStations
     newState = GameState transferredStations routes transferredLocomotives mode newTime
