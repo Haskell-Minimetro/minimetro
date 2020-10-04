@@ -6,7 +6,7 @@ import qualified System.Random as Random
 type Position = CW.Point
 
 -- | Asset Type : Line with Color, Train or Wagon
-data AssetType = LineColor Color | Train | Wagon 
+data AssetType = LineColor CW.Color | Train | Wagon 
   deriving (Eq, Show)
 
 -- | IsUsed wrapper
@@ -43,7 +43,7 @@ data Direction = Forward | Backward
   deriving (Eq, Show)
 
 -- | 
-data StationStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
+data StationStatus = OnRoute Route Double | TransferTo Position CW.Color | TransferFrom Position CW.Color | Ready Position CW.Color
   deriving (Show)
 
 -- | Locomotive 
