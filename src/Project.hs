@@ -202,8 +202,6 @@ updateDynamic dt (GameState stations routes locomotives assets mode currentTime)
     (transferredLocomotives, transferredStations) = transferPassengers updatedLocomotives updatedStations
     newState = GameState transferredStations routes transferredLocomotives assets mode newTime
 
-
--- TODO: addition of locomotive by point and click
 updateGameState :: Event -> GameState -> GameState
 updateGameState (PointerPress p) state = handleClick p state
 updateGameState (TimePassing dt) state = updateDynamic dt state
@@ -216,10 +214,32 @@ getStationByCoord point stations = myStations
     myStations = find (\a -> withinErrorPosition (getStationPosition a) point 1) stations
 
 getControlByCoord :: Point -> Maybe Control
-getControlByCoord point = foundControl
+getControlByCoord point =
+  case foundControl of
+    Just control -> Just control
+    Nothing -> case find (\(Control _ (x, y)) -> withinErrorPosition (x+1, y+1) point 0.5) controls of
+      Just (Control assetType _) -> Just (Removal assetType)
+      Just x -> Just x
+      Nothing -> Nothing
   where
     foundControl :: Maybe Control
     foundControl = find (\(Control _ pos) -> withinErrorPosition pos point 0.5) controls
+
+getLocomotiveColor :: Locomotive -> Color
+getLocomotiveColor (Locomotive _ _ (Ready _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ (TransferTo _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ (TransferFrom _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ (OnRoute (Route trainColor _ _) _)) = trainColor
+
+removeAssetType :: AssetType -> GameState -> GameState
+removeAssetType (LineColor routeColor) (GameState stations routes locos assets mode time) = newState
+  where
+    newState = GameState stations newRoutes newLocos assets mode time -- TODO: assets here
+    newRoutes = filter (\(Route color _ _) -> color /= routeColor) routes
+    newLocos = filter (\locomotive -> getLocomotiveColor locomotive /= routeColor) locos
+
+removeAssetType Train (GameState stations routes _ assets mode time) = GameState stations routes [] assets mode time
+removeAssetType _ state = state
 
 handleClick :: Point -> GameState -> GameState
 handleClick point state@(GameState stations routes locos assets Play time) 
@@ -233,10 +253,12 @@ handleClick point state@(GameState stations routes locos assets Play time)
           Just (Control Train _) -> GameState stations routes locos assets Repopulation time
           Just (Control Wagon _) -> state
           Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+          Just (Removal assetType) -> removeAssetType assetType state
 
 handleClick point state@(GameState stations routes locos assets Repopulation time)
   = case getControlByCoord point of 
       Nothing -> state
+      Just (Removal _) -> state
       Just (Control Train _) -> state
       Just (Control Wagon _) -> state
       Just (Control (LineColor trainColor) _ ) -> case chosenRoute of 
