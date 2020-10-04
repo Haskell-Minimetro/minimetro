@@ -1,8 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 
 module ActivityOfEnhancements where
-import qualified CodeWorld as CW
+import CodeWorld
 
 type ActivityOf world
   = world

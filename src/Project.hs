@@ -3,52 +3,48 @@
 
 module Project where
 
-import qualified CodeWorld              as CW
-import qualified System.Random          as Random
-import qualified Data.Fixed             as Fixed
-import qualified Data.List              as List   (find)
-
-import qualified ActivityOfEnhancements as AOE
-import qualified Drawers
+import ActivityOfEnhancements
+import CodeWorld
+import Data.Fixed
+-- import Data.Text (pack)
+import Drawers
+import System.Random
 import Types
-import qualified Config
+import Data.List (find)
+import Config
 
--- | Update locomotive position if it is on Route
+drawGameState :: GameState -> Picture
+drawGameState gameState =
+  renderObject drawStation (getStations gameState)
+    <> drawControls gameState
+    <> renderObject drawLocomotive (getLocomotives gameState)
+    <> renderObject drawRoute (getRoutes gameState)
+    <> backgroundImage
+
 updateLocomotivePosition :: Double -> Locomotive -> Locomotive
-updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) 
-  = Locomotive passengers direction (OnRoute route newProgress)
-    where
-      newProgress = calculateProgress direction progress dt Config.locomotiveSpeed
+updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
+  where
+    newProgress = calculateProgress direction progress dt speed
+    speed = 1 -- TODO: setup speed
 updateLocomotivePosition _dt locomotive = locomotive
 
--- | Calculate new progress of a locomotive being on route
-calculateProgress 
-  :: Direction -- locomotive's direction on route
-  -> Double    -- previous progress
-  -> Double    -- time passed
-  -> Double    -- locomotive's speed 
-  -> Double    -- new progress
+calculateProgress :: Direction -> Double -> Double -> Double -> Double
 calculateProgress Forward progress dt speed = progress + dt * speed
 calculateProgress Backward progress dt speed = progress - dt * speed
 
--- | Inverts direction
 inverseDirection :: Direction -> Direction
 inverseDirection Backward = Forward
 inverseDirection Forward = Backward
 
--- | Estimates if 2 points are in the same neighbourhood (epsilon * epsilon)
 withinErrorPosition :: Position -> Position -> Double -> Bool
-withinErrorPosition (x1, y1) (x2, y2) epsilon 
-  =  withinError x1 x2 epsilon 
-  && withinError y1 y2 epsilon
+withinErrorPosition (x, y) (x2, y2) epsilon = withinError x x2 epsilon && withinError y y2 epsilon
 
--- | Estimates if 2 Numbers are in the same neighbourhood
-withinError :: (Ord a, Num a) => a -> a -> a -> Bool
+withinError :: Double -> Double -> Double -> Bool
 withinError a b epsilon = abs (a - b) < epsilon
 
 withTimePassing :: forall world. Double -> Double -> (Double -> world -> world) -> (Double -> world -> world)
 withTimePassing currentTime threshold func
-  | currentTime `Fixed.mod'` threshold < 0.05 = func
+  | currentTime `mod'` threshold < 0.05 = func
   | otherwise = const id
 
 
@@ -61,7 +57,7 @@ nth n (_ : xs) = nth (n - 1) xs
 updateStation :: Double -> Station -> Station
 updateStation _dt (Station stationType pos passengers gen) = Station stationType pos newPassengers newGen
   where
-    (number, newGen) = Random.randomR (0 :: Int, 1) gen
+    (number, newGen) = randomR (0 :: Int, 1) gen
     newPassenger =
       case nth number (filter (\(Passenger x)-> x /= stationType ) possibleValues) of
         Just passenger -> passenger
@@ -112,7 +108,7 @@ transferPassangersToLocomotive locomotive@(Locomotive trainPassangers direction 
 transferPassangersToLocomotive locomotive station = (locomotive, station)
 
 
-routeFilter :: CW.Color -> Position -> Route -> Bool
+routeFilter :: Color -> Position -> Route -> Bool
 routeFilter color pos (Route routeColor pos1 _pos2) = color == routeColor && pos1 == pos
 
 getTransferRoute :: [Route] -> Locomotive -> Maybe (Route, Direction)
@@ -132,10 +128,10 @@ getTransferRoute routes (Locomotive _ direction (Ready pos color)) =
                     Nothing -> Nothing
   where
     getTransferForward :: Maybe Route
-    getTransferForward = List.find (\(Route routeColor pos1 _pos2) -> color == routeColor && pos1 == pos) routes
+    getTransferForward = find (\(Route routeColor pos1 _pos2) -> color == routeColor && pos1 == pos) routes
 
     getTransferBackward ::Maybe Route
-    getTransferBackward = List.find (\(Route routeColor _pos1 pos2) -> color == routeColor && pos2 == pos) routes
+    getTransferBackward = find (\(Route routeColor _pos1 pos2) -> color == routeColor && pos2 == pos) routes
 getTransferRoute _ _ = Nothing
 
 transferLocomotive :: [Route] -> Locomotive -> Locomotive
@@ -194,7 +190,7 @@ transferPassengers trains (first:rest) = (updatedTrains, updatesStations)
     updatesStations = newStation : nextStations
 
 updateDynamic :: Double -> GameState -> GameState
-updateDynamic dt (GameState stations routes locomotives assets mode currentTime) = newState
+updateDynamic dt (GameState stations routes locomotives mode currentTime) = newState
   where
     updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives
     newTime = updateTime currentTime dt mode
@@ -202,64 +198,98 @@ updateDynamic dt (GameState stations routes locomotives assets mode currentTime)
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
 
     (transferredLocomotives, transferredStations) = transferPassengers updatedLocomotives updatedStations
-    newState = GameState transferredStations routes transferredLocomotives assets mode newTime
+    newState = GameState transferredStations routes transferredLocomotives mode newTime
 
-
--- TODO: addition of locomotive by point and click
-updateGameState :: CW.Event -> GameState -> GameState
-updateGameState (CW.PointerPress p) state = handleClick p state
-updateGameState (CW.TimePassing dt) state = updateDynamic dt state
+updateGameState :: Event -> GameState -> GameState
+updateGameState (PointerPress p) state = handleClick p state
+updateGameState (TimePassing dt) state = updateDynamic dt state
 updateGameState _ state = state
 
-getStationByCoord :: CW.Point -> [Station] -> Maybe Station
+getStationByCoord :: Point -> [Station] -> Maybe Station
 getStationByCoord point stations = myStations
   where
     myStations :: Maybe Station
-    myStations = List.find (\a -> withinErrorPosition (getStationPosition a) point 1) stations
+    myStations = find (\a -> withinErrorPosition (getStationPosition a) point 1) stations
 
-getControlByCoord :: CW.Point -> Maybe Control
-getControlByCoord point = foundControl
+getControlByCoord :: Point -> Maybe Control
+getControlByCoord point =
+  case foundControl of
+    Just control -> Just control
+    Nothing -> case find (\(Control _ (x, y)) -> withinErrorPosition (x+1, y+1) point 0.5) controls of
+      Just (Control assetType _) -> Just (Removal assetType)
+      Just x -> Just x
+      Nothing -> Nothing
   where
     foundControl :: Maybe Control
-    foundControl = List.find (\(Control _ pos) -> withinErrorPosition pos point 0.5) Config.controls
+    foundControl = find (\(Control _ pos) -> withinErrorPosition pos point 0.5) controls
 
-handleClick :: CW.Point -> GameState -> GameState
-handleClick point state@(GameState stations routes locos assets Play time) 
-  = if isEnabled then  withColorPicked else state
+getLocomotiveColor :: Locomotive -> Color
+getLocomotiveColor (Locomotive _ _ (Ready _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ (TransferTo _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ (TransferFrom _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ (OnRoute (Route trainColor _ _) _)) = trainColor
+
+removeAssetType :: AssetType -> GameState -> GameState
+removeAssetType (LineColor routeColor) (GameState stations routes locos mode time) = newState
+  where
+    newState = GameState stations newRoutes newLocos mode time
+    newRoutes = filter (\(Route color _ _) -> color /= routeColor) routes
+    newLocos = filter (\locomotive -> getLocomotiveColor locomotive /= routeColor) locos
+
+removeAssetType Train (GameState stations routes _ mode time) = GameState stations routes [] mode time
+removeAssetType _ state = state
+
+handleClick :: Point -> GameState -> GameState
+handleClick point state@(GameState stations routes locos Play time) 
+  = withColorPicked
     where
-      week = floor (time / 10)
-      isEnabled = week > length assets - 3
+      outOfAssets = getAmountOfAssets time <= getAmountOfAssetsUsed state
+
+      colors = getUniqueLinesColors routes
+      isAvailable asset = isAssetAvailable outOfAssets asset colors 
+
       withColorPicked =
         case getControlByCoord point of
           Nothing -> state
-          Just (Control Train _) -> state
+          Just (Control Train _) ->
+            if isAvailable Train then GameState stations routes locos Repopulation time else state
           Just (Control Wagon _) -> state
-          Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+          Just (Control (LineColor color) _) ->
+            if isAvailable (LineColor color) then GameState stations routes locos (Construction color Nothing) time else state
+          Just (Removal assetType) -> removeAssetType assetType state
 
-handleClick point state@(GameState stations routes locos assets (Construction color Nothing) time) = turnConstructionOn
+handleClick point state@(GameState stations routes locos Repopulation time)
+  = case getControlByCoord point of 
+      Nothing -> state
+      Just (Removal _) -> state
+      Just (Control Train _) -> state
+      Just (Control Wagon _) -> state
+      Just (Control (LineColor trainColor) _ ) -> case chosenRoute of 
+          Nothing -> GameState stations routes locos Play time
+          Just (Route _ startPosition _) -> GameState stations routes (Locomotive [] Forward (Ready startPosition trainColor):locos) Play time
+        where
+          chosenRoute = find (\(Route color _ _ ) -> color == trainColor) routes
+
+handleClick point state@(GameState stations routes locos (Construction color Nothing) time) = turnConstructionOn
   where
     turnConstructionOn =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations routes locos assets (Construction color (Just x)) time
+        Just x -> GameState stations routes locos (Construction color (Just x)) time
 
-
-handleClick point state@(GameState stations routes locos assets (Construction color (Just startStation)) time) = turnConstructionOff
+handleClick point state@(GameState stations routes locos (Construction color (Just startStation)) time) = turnConstructionOff
   where
     turnConstructionOff =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just secondStation -> GameState stations newRoutes locos newAssets Play time
+        Just secondStation -> GameState stations newRoutes locos Play time
           where
-            newAssets = Asset (LineColor color) (IsUsed True) : assets
             newRoutes = 
               case createNewRoute routes color startStation secondStation of
                 Nothing -> routes
                 Just route -> route : routes
 
-handleClick _ state = state
-
-createNewRoute :: [Route] -> CW.Color -> Station -> Station -> Maybe Route
+createNewRoute :: [Route] -> Color -> Station -> Station -> Maybe Route
 createNewRoute routes routeColor firstStation secondStation = newRoute
   where
     filteredRoutes = filter (\(Route color _ _ ) -> color == routeColor) routes
@@ -297,15 +327,15 @@ createNewRoute routes routeColor firstStation secondStation = newRoute
 initialSystem :: GameState
 initialSystem =
   GameState
-    [ 
-      Station Circle    (3, 4)  [] (Random.mkStdGen 42),
-      Station Rectangle (2, -6) [] (Random.mkStdGen 41),
-      Station Triangle  (-4, 2) [] (Random.mkStdGen 40),
-      Station Triangle  (4, 2)  [] (Random.mkStdGen 39)
+    [ Station Circle (3, 4) [] (mkStdGen 42),
+      Station Rectangle (2, -6) [] (mkStdGen 41),
+      Station Triangle (-6, 2) [] (mkStdGen 40),
+      Station Triangle (4, 2) [] (mkStdGen 39),
+      Station Rectangle (0, 8) [] (mkStdGen 38),
+      Station Circle (-4, -4) [] (mkStdGen 37)
     ]
-    [Route CW.brown (3, 4) (2, -6), Route CW.brown (2, -6) (-4, 2)]
-    [Locomotive [] Forward (Ready (3,4) CW.brown)]
-    [Asset (LineColor CW.brown) (IsUsed True), Asset Train (IsUsed True)]
+    []
+    []
     Play
     0
 
@@ -314,29 +344,22 @@ isGameOver state = stationsAreFull (getStations state)
   where
     stationsAreFull :: [Station] -> Bool
     stationsAreFull [] = False
-    stationsAreFull (first : rest) = length (getStationPassengers first) >= Config.maxPassangers || stationsAreFull rest
+    stationsAreFull (first : rest) = length (getStationPassengers first) >= maxPassangers || stationsAreFull rest
 
 -- TODO: Maybe some better showage that its over
-withGameOver 
-  :: forall world
-  . (world -> Bool) 
-  -> AOE.ActivityOf world 
-  -> AOE.ActivityOf world
+withGameOver :: forall world. (world -> Bool) -> ActivityOf world -> ActivityOf world
 withGameOver isOver originalActivityOf userWorld userHandler userDrawer =
   originalActivityOf userWorld ignoreInput updatedDrawer
   where
-    ignoreInput :: CW.Event -> world -> world
+    ignoreInput :: Event -> world -> world
     ignoreInput event state
       | isOver state = state
       | otherwise = userHandler event state
 
-    updatedDrawer :: world -> CW.Picture
+    updatedDrawer :: world -> Picture
     updatedDrawer state
-      | isOver state = CW.translated 9 9 (CW.lettering "Game Over") <> userDrawer state
+      | isOver state = translated 9.6 9.2 (colored red (lettering "Game Over")) <> userDrawer state
       | otherwise = userDrawer state
 
-run2 :: IO ()
-run2 = withGameOver isGameOver (AOE.withStartScreen (AOE.withReset CW.activityOf)) initialSystem updateGameState Drawers.drawGameState
-
 run :: IO ()
-run = CW.debugActivityOf initialSystem updateGameState Drawers.drawGameState
+run = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState
