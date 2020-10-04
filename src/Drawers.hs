@@ -1,7 +1,8 @@
 module Drawers where 
-import  Types
+import Types
 import CodeWorld
-import Data.Text (pack)
+import Config (lineColors)
+-- import Data.Text (pack)
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -70,9 +71,9 @@ drawRoute (Route color station1 station2@(x, y)) = colored color (thickCurve 0.3
     positions = [station1, station2]
 
 drawLocomotive :: Locomotive -> Picture
-drawLocomotive (Locomotive trainPassangers direction others) = drawing
-  <> translated (-9) (-8) (lettering (pack $ show  direction))
-  <> translated (-9) (-9) (lettering (pack $ show  others))
+drawLocomotive (Locomotive trainPassangers _direction others) = drawing
+  -- <> translated (-9) (-8) (lettering (pack $ show  direction))
+  -- <> translated (-9) (-9) (lettering (pack $ show  others))
   where
     drawing =
       case others of 
@@ -95,3 +96,17 @@ getAngle (x1, y1) (x2, y2) = atan ((y1 - y2) / (x1 - x2))
 drawPassengersOnTrain :: [Passenger] -> Picture
 drawPassengersOnTrain [] = blank
 drawPassengersOnTrain passenger = drawInARow (take 2 passenger) 0.25 drawPassanger <> translated 0 0.25 (drawPassengersOnTrain (drop 2 passenger))
+
+
+drawControl :: Color -> Picture
+drawControl backgroundColor = colored backgroundColor $ solidCircle 0.75
+
+drawAssets :: GameState -> Picture
+drawAssets (GameState _ _ _ assets _mode currentTime) 
+  = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
+  -- <> lettering mode
+  where
+    week = floor currentTime `div` 7
+    isEnabled = week > length assets - 2 
+    scaleFactor = if isEnabled then 1 else 0.3
+    translateFactor = if isEnabled then 0 else 2

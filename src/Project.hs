@@ -12,18 +12,14 @@ import System.Random
 import Types
 import Data.List (find)
 import Data.Maybe (listToMaybe)
-
-maxPassangers :: Int
-maxPassangers = 30
-
-maxPassengersOnTrain :: Int
-maxPassengersOnTrain = 6
+import Config (maxPassangers)
 
 drawGameState :: GameState -> Picture
 drawGameState gameState =
   renderObject drawStation (getStations gameState)
     <> translated (-9) (-6) (lettering (pack $ show (getCurrentMode gameState)))
-    <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
+    -- <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
+    <> translated (-2) (-8) (drawAssets gameState)
     <> renderObject drawLocomotive (getLocomotives gameState)
     <> renderObject drawRoute (getRoutes gameState)
     <> backgroundImage
@@ -71,6 +67,18 @@ getRandomPassenger :: Int -> Passenger
 getRandomPassenger 0 = Passenger Triangle
 getRandomPassenger 1 = Passenger Rectangle
 getRandomPassenger _ = Passenger Circle
+
+
+
+-- updateAssets :: Double -> [Asset] -> [Asset]
+-- updateAssets dt assets = newAssets
+--   where
+--     week = dt `div` 24 * 7
+--     newAssets = if isNewWeek then do    
+--         gen <- newStdGen
+--         (number, _) <- randomR (0 :: Int, 2) gen 
+--         return [LineColor (getRandomColor num) IsUsed False, Train IsUsed False] ++ assets
+--       else return assets
 
 -- TODO: the state of the station may change for transfers, but not for now
 transferPassangersToStation :: Locomotive -> Station -> (Locomotive, Station)
@@ -152,26 +160,20 @@ stopLocomotive stations locomotive@(Locomotive passengers direction (OnRoute rou
   | otherwise = locomotive
 stopLocomotive _stations locomotive = locomotive
 
+updateTime :: Double -> Double -> GameMode -> Double
+updateTime currentTime dt Play = currentTime + dt
+updateTime currentTime _ _ = currentTime
+
 -- TODO: passanger setting on the train
 updateDynamic :: Double -> GameState -> GameState
-updateDynamic dt state = newState
+updateDynamic dt (GameState stations routes locomotives assets mode currentTime) = newState
   where
-    stations = getStations state
-    routes = getRoutes state
-    locomotives = getLocomotives state
     updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives -- Some filter on routes/locomotives
     -- TODO: transferPassangersFromStation . transferPassangersToStation 
-    newTime = dt + currentTime
-    currentTime = getCurrentTime state
+    newTime = updateTime currentTime dt mode
 
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
-    newState =
-      GameState
-        updatedStations
-        routes
-        updatedLocomotives
-        (getCurrentMode state)
-        newTime
+    newState = GameState updatedStations routes updatedLocomotives assets mode newTime
 
 -- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
@@ -187,31 +189,32 @@ getStationByCoord p stations = myStations
     myStations = find (\a -> withinErrorPosition (getStationPosition a) p 1) stations
 
 handleClick :: Point -> GameState -> GameState
-handleClick point state@(GameState stations routes locos Play time) = turnConstructionOn
+handleClick point state@(GameState stations routes locos assets Play time) = turnConstructionOn
   where
     turnConstructionOn =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations routes locos (Construction x) time
+        Just x -> GameState stations routes locos assets (Construction green (Just x)) time
 
-handleClick point state@(GameState stations routes locos (Construction startStation) time) = turnConstructionOff
+handleClick _ state@(GameState _ _ _ _ (Construction _ Nothing) _) = state
+handleClick point state@(GameState stations routes locos assets (Construction color (Just startStation)) time) = turnConstructionOff
   where
     turnConstructionOff =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations newRoutes locos Play time
+        Just x -> GameState stations newRoutes locos assets Play time
           where
             newRoutes :: [Route]
             -- TODO: remove color hardcode
             newRoutes = 
               case (sameTargetStationRoutes) of
-                Nothing -> Route brown (getStationPosition startStation) (getStationPosition x) : routes
-                Just _ -> Route brown (getStationPosition x) (getStationPosition startStation) : routes
+                Nothing -> Route color (getStationPosition startStation) (getStationPosition x) : routes
+                Just _ -> Route color (getStationPosition x) (getStationPosition startStation) : routes
 
             sameTargetStationRoutes :: Maybe Route
             sameTargetStationRoutes = listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
 
-handleClick _ (GameState stations routes locos mode time) = GameState stations routes locos mode time
+handleClick _ (GameState stations routes locos assets mode time) = GameState stations routes locos assets mode time
 
 initialSystem :: GameState
 initialSystem =
@@ -226,6 +229,7 @@ initialSystem =
     ]
     [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
     [Locomotive [] Forward (Ready (3,4) brown)]
+    [Asset (LineColor brown) (IsUsed True), Asset Train (IsUsed True)]
     Play
     0
 

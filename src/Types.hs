@@ -3,17 +3,19 @@ import CodeWorld
 import System.Random
 
 type Position = Point
-data Asset = Bridge | Train | Wagon
+
+data Creatable = LineColor Color | Train | Wagon 
   deriving (Eq, Show)
-data Object = Object Asset Position
-  deriving (Eq, Show)
-type ObjectDrawer = Object -> Picture
+
+newtype IsUsed = IsUsed Bool
+data Asset = Asset Creatable IsUsed
+  
 
 data Figure = TriangleFigure | SquareFigure | CircleFigure
 data StationType = Triangle | Rectangle | Circle
   deriving (Eq, Show)
 
-data Passenger = Passenger StationType
+newtype Passenger = Passenger StationType
   deriving (Eq, Show)
 
 data Station = Station {
@@ -30,6 +32,7 @@ data Direction = Forward | Backward
 
 data StationStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
   deriving (Show)
+  
 data Locomotive = Locomotive {
                               getLocomotivePassengers      :: [Passenger],
                               getLocomotiveDirection       :: Direction,
@@ -38,13 +41,15 @@ data Locomotive = Locomotive {
 
 data Route = Route Color Position Position
   deriving (Show)
-data GameMode = Play | Construction Station | GameOver
+
+data GameMode = Play | Construction Color (Maybe Station) | GameOver
   deriving (Show)
 
 data GameState = GameState {
                             getStations     :: [Station],
                             getRoutes       :: [Route],
                             getLocomotives  :: [Locomotive],
+                            getAssets       :: [Asset],
                             getCurrentMode  :: GameMode,
                             getCurrentTime  :: Double
                             }
