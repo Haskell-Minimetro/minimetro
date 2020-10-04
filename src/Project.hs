@@ -226,14 +226,17 @@ getControlByCoord point = foundControl
     foundControl = find (\(Control _ pos) -> withinErrorPosition pos point 0.5) controls
 
 handleClick :: Point -> GameState -> GameState
-handleClick point state@(GameState stations routes locos assets Play time) = withColorPicked
-  where
-    withColorPicked =
-      case getControlByCoord point of
-        Nothing -> state
-        Just (Control Train _) -> state
-        Just (Control Wagon _) -> state
-        Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+handleClick point state@(GameState stations routes locos assets Play time) 
+  = if isEnabled then  withColorPicked else state
+    where
+      week = floor (time / 10)
+      isEnabled = week > length assets - 3
+      withColorPicked =
+        case getControlByCoord point of
+          Nothing -> state
+          Just (Control Train _) -> state
+          Just (Control Wagon _) -> state
+          Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
 
 handleClick point state@(GameState stations routes locos assets (Construction color Nothing) time) = turnConstructionOn
   where
@@ -248,7 +251,7 @@ handleClick point state@(GameState stations routes locos assets (Construction co
     turnConstructionOff =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations newRoutes locos assets Play time
+        Just x -> GameState stations newRoutes locos newAssets Play time
           where
             newRoutes :: [Route]
             -- TODO: remove color hardcode
@@ -259,6 +262,8 @@ handleClick point state@(GameState stations routes locos assets (Construction co
 
             sameTargetStationRoutes :: Maybe Route
             sameTargetStationRoutes = listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
+
+            newAssets = Asset (LineColor color) (IsUsed True) : assets
 
 handleClick _ (GameState stations routes locos assets mode time) = GameState stations routes locos assets mode time
 

@@ -120,8 +120,10 @@ drawAssetType Wagon = lettering "🚟" <> defaultControlBackground
 drawControlsRecursion :: [Control] -> Bool -> Picture
 drawControlsRecursion [] _ = blank
 drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
-  = translated x y (drawAssetType assetType)
+  = translated x y (scaled scaleFactor scaleFactor (drawAssetType assetType))
   <> drawControlsRecursion rest isEnabled
+  where
+    scaleFactor = if isEnabled then 1 else 0.3
 
 drawControls :: GameState -> Picture
 drawControls (GameState _ _ _ assets _mode currentTime) 
@@ -129,5 +131,5 @@ drawControls (GameState _ _ _ assets _mode currentTime)
   -- = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
   -- <> lettering mode
   where
-    week = floor currentTime `div` 7
-    isEnabled = week > length assets - 2 
+    week = floor (currentTime / 10)
+    isEnabled = week > length assets - 3
