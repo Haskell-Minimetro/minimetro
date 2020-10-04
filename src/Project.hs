@@ -43,12 +43,6 @@ inverseDirection :: Direction -> Direction
 inverseDirection Backward = Forward
 inverseDirection Forward = Backward
 
-checkTransfer :: Position -> Route -> (Bool, Direction)
-checkTransfer trainPosition (Route _ pos1 pos2)
-  | withinErrorPosition trainPosition pos1 1e-0 = (True, Forward)
-  | withinErrorPosition trainPosition pos2 1e-0 = (True, Backward)
-  | otherwise = (False, Forward)
-
 withinErrorPosition :: Position -> Position -> Double -> Bool
 withinErrorPosition (x, y) (x2, y2) epsilon = withinError x x2 epsilon && withinError y y2 epsilon
 
@@ -60,23 +54,45 @@ withTimePassing currentTime threshold func
   | currentTime `mod'` threshold < 0.05 = func
   | otherwise = const id
 
+
+nth :: Int -> [a] -> Maybe a
+nth _ []       = Nothing
+nth 0 (x : _)  = Just x
+nth n (_ : xs) = nth (n - 1) xs
+
 -- TODO: add exponential grow of appearance of new passengers
 updateStation :: Double -> Station -> Station
 updateStation _dt (Station stationType pos passengers gen) = Station stationType pos newPassengers newGen
   where
-    (number, newGen) = randomR (0 :: Int, 2) gen
-    newPassengers = passengers ++ [getRandomPassenger number]
+    (number, newGen) = randomR (0 :: Int, 1) gen
+    newPassenger =
+      case nth number (filter (\(Passenger x)-> x /= stationType ) possibleValues) of
+        Just passenger -> passenger
+        Nothing -> Passenger Circle
+    possibleValues = [Passenger Triangle, Passenger Rectangle, Passenger Circle]
+    newPassengers = passengers ++ [newPassenger]
 
 getRandomPassenger :: Int -> Passenger
 getRandomPassenger 0 = Passenger Triangle
 getRandomPassenger 1 = Passenger Rectangle
 getRandomPassenger _ = Passenger Circle
 
+
+checkTransfer :: Locomotive -> Station -> Bool
+checkTransfer locomotive station =
+  case getLocomotiveStatus locomotive of
+    (Ready _ _) -> False
+    (OnRoute _ _) -> False
+    (TransferTo pos _) -> pos == getStationPosition station
+    (TransferFrom pos _) -> pos == getStationPosition station
+
 -- TODO: the state of the station may change for transfers, but not for now
 transferPassangersToStation :: Locomotive -> Station -> (Locomotive, Station)
-transferPassangersToStation (Locomotive passengers direction (TransferTo position color)) station = (updatedLocomotive, updatedStation)
+transferPassangersToStation locomotive@(Locomotive passengers direction (TransferTo position color)) station
+  | checkTransfer locomotive station = (updatedLocomotive, updatedStation)
+  | otherwise = (locomotive, station)
   where
-    trainPassangers = map Passenger (filter (==stationType) (map (\(Passenger x) -> x) passengers))
+    trainPassangers = map Passenger (filter (/=stationType) (map (\(Passenger x) -> x) passengers))
     stationType = getStationType station
 
     updatedLocomotive = Locomotive trainPassangers direction (TransferFrom position color)
@@ -84,7 +100,9 @@ transferPassangersToStation (Locomotive passengers direction (TransferTo positio
 transferPassangersToStation locomotive station = (locomotive, station)
 
 transferPassangersToLocomotive :: Locomotive -> Station -> (Locomotive, Station)
-transferPassangersToLocomotive (Locomotive trainPassangers direction (TransferFrom position color)) station = (updatedLocomotive, updatedStation)
+transferPassangersToLocomotive locomotive@(Locomotive trainPassangers direction (TransferFrom position color)) station
+  | checkTransfer locomotive station = (updatedLocomotive, updatedStation)
+  | otherwise = (locomotive, station)
   where
     stationPassengers = getStationPassengers station
     maxToTransfer = 6 - length trainPassangers
@@ -111,9 +129,9 @@ getTransferRoute routes (Locomotive _ direction (Ready pos color)) =
                     Nothing -> Nothing
     Backward ->
       case getTransferBackward of
-        Just routeForward -> Just (routeForward, Backward)
+        Just routeBackward -> Just (routeBackward, Backward)
         Nothing -> case getTransferForward of
-                    Just routeBackward -> Just (routeBackward, Forward)
+                    Just routeForward -> Just (routeForward, Forward)
                     Nothing -> Nothing
   where
     getTransferForward :: Maybe Route
@@ -143,16 +161,37 @@ stopLocomotive :: [Station] -> Locomotive -> Locomotive
 stopLocomotive stations locomotive@(Locomotive passengers direction (OnRoute route@(Route color _ _) progress))
   | progress > 1 = 
     case getStationByCoord (directionRouteToPos route direction) stations of
-      Just station -> Locomotive passengers direction (Ready (getStationPosition station) color) -- ToDo: TransferTo instead of Ready
+      Just station -> Locomotive passengers direction (TransferTo (getStationPosition station) color)
       Nothing -> locomotive
   | progress < 0 = 
     case getStationByCoord (directionRouteToPos route direction) stations of
-      Just station -> Locomotive passengers direction (Ready (getStationPosition station) color) -- ToDo: TransferTo instead of Ready
+      Just station -> Locomotive passengers direction (TransferTo (getStationPosition station) color)
       Nothing -> locomotive
   | otherwise = locomotive
 stopLocomotive _stations locomotive = locomotive
 
--- TODO: passanger setting on the train
+transferPassengersHelper :: [Locomotive] -> Station -> ([Locomotive], Station)
+transferPassengersHelper [] station = ([], station)
+transferPassengersHelper (locomotive:rest) station = (newLocomotive:nextLocomotives, nextStation)
+  where
+    (newLocomotive, newStation) =
+      case getLocomotiveStatus locomotive of
+        (OnRoute _ _) -> (locomotive, station)
+        (TransferTo _ _) -> transferPassangersToStation locomotive station
+        (TransferFrom _ _) -> transferPassangersToLocomotive locomotive station
+        (Ready _ _) -> (locomotive, station)
+    (nextLocomotives, nextStation) = transferPassengersHelper rest newStation
+
+transferPassengers :: [Locomotive] -> [Station] -> ([Locomotive], [Station])
+transferPassengers trains [] = (trains, [])
+transferPassengers trains (first:rest) = (updatedTrains, updatesStations)
+  where
+    (newTrains, newStation) = transferPassengersHelper trains first
+
+    (nextTrains, nextStations) = transferPassengers newTrains rest
+    updatedTrains = nextTrains
+    updatesStations = newStation : nextStations
+
 updateDynamic :: Double -> GameState -> GameState
 updateDynamic dt state = newState
   where
@@ -160,16 +199,19 @@ updateDynamic dt state = newState
     routes = getRoutes state
     locomotives = getLocomotives state
     updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives -- Some filter on routes/locomotives
-    -- TODO: transferPassangersFromStation . transferPassangersToStation 
+    
     newTime = dt + currentTime
     currentTime = getCurrentTime state
-
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
+
+    (transferredLocomotives, transferredStations) = transferPassengers updatedLocomotives updatedStations
+
+
     newState =
       GameState
-        updatedStations
+        transferredStations
         routes
-        updatedLocomotives
+        transferredLocomotives
         (getCurrentMode state)
         newTime
 
