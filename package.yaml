@@ -46,7 +46,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - my-project
+    - minimetro
 
 tests:
   spec:
@@ -57,7 +57,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - my-project
+    - minimetro
     - hspec
     - HUnit
     - QuickCheck
