@@ -1,8 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Drawers where 
 import Types
 import CodeWorld
-import Config (lineColors)
+-- import CodeWorld.Image
+import Config
 -- import Data.Text (pack)
+-- import qualified Data.Text as T
+
+-- trainEmoji :: Picture
+-- trainEmoji = image "train" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/train_1f686.png" 16 16
+
+-- wagonEmoji :: Picture
+-- wagonEmoji = image "wagon" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/railway-car_1f683.png" 16 16
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -66,7 +75,7 @@ renderObject func = pictures . map func
 
 
 drawRoute :: Route -> Picture
-drawRoute (Route color station1 station2@(x, y)) = colored color (thickCurve 0.3 positions) <> translated x y (colored red $ solidCircle 0.7)
+drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positions) -- <> translated x y (colored red $ solidCircle 0.7)
   where
     positions = [station1, station2]
 
@@ -98,15 +107,27 @@ drawPassengersOnTrain [] = blank
 drawPassengersOnTrain passenger = drawInARow (take 2 passenger) 0.25 drawPassanger <> translated 0 0.25 (drawPassengersOnTrain (drop 2 passenger))
 
 
-drawControl :: Color -> Picture
-drawControl backgroundColor = colored backgroundColor $ solidCircle 0.75
+defaultControlBackground :: Picture
+defaultControlBackground = colored gray (solidCircle 0.65) <> colored (dark gray) (solidCircle 0.75)
 
-drawAssets :: GameState -> Picture
-drawAssets (GameState _ _ _ assets _mode currentTime) 
-  = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
+drawAssetType :: AssetType -> Picture
+drawAssetType (LineColor backgroundColor) 
+  = colored backgroundColor (solidCircle 0.65)
+  <> colored (dark backgroundColor) (solidCircle 0.75)
+drawAssetType Train = lettering "🚅" <> defaultControlBackground
+drawAssetType Wagon = lettering "🚟" <> defaultControlBackground
+
+drawControlsRecursion :: [Control] -> Bool -> Picture
+drawControlsRecursion [] _ = blank
+drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
+  = translated x y (drawAssetType assetType)
+  <> drawControlsRecursion rest isEnabled
+
+drawControls :: GameState -> Picture
+drawControls (GameState _ _ _ assets _mode currentTime) 
+  = drawControlsRecursion controls isEnabled
+  -- = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
   -- <> lettering mode
   where
     week = floor currentTime `div` 7
     isEnabled = week > length assets - 2 
-    scaleFactor = if isEnabled then 1 else 0.3
-    translateFactor = if isEnabled then 0 else 2

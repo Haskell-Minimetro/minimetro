@@ -4,12 +4,13 @@ import System.Random
 
 type Position = Point
 
-data Creatable = LineColor Color | Train | Wagon 
+data AssetType = LineColor Color | Train | Wagon 
   deriving (Eq, Show)
 
 newtype IsUsed = IsUsed Bool
-data Asset = Asset Creatable IsUsed
-  
+data Asset = Asset AssetType IsUsed
+
+data Control = Control AssetType Position
 
 data Figure = TriangleFigure | SquareFigure | CircleFigure
 data StationType = Triangle | Rectangle | Circle
@@ -44,6 +45,7 @@ data Route = Route Color Position Position
 
 data GameMode = Play | Construction Color (Maybe Station) | GameOver
   deriving (Show)
+
 
 data GameState = GameState {
                             getStations     :: [Station],

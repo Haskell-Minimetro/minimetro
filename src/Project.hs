@@ -12,14 +12,14 @@ import System.Random
 import Types
 import Data.List (find)
 import Data.Maybe (listToMaybe)
-import Config (maxPassangers)
+import Config
 
 drawGameState :: GameState -> Picture
 drawGameState gameState =
   renderObject drawStation (getStations gameState)
     <> translated (-9) (-6) (lettering (pack $ show (getCurrentMode gameState)))
     -- <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
-    <> translated (-2) (-8) (drawAssets gameState)
+    <> drawControls gameState
     <> renderObject drawLocomotive (getLocomotives gameState)
     <> renderObject drawRoute (getRoutes gameState)
     <> backgroundImage
@@ -214,20 +214,35 @@ updateGameState (TimePassing dt) state = updateDynamic dt state
 updateGameState _ state = state
 
 getStationByCoord :: Point -> [Station] -> Maybe Station
-getStationByCoord p stations = myStations
+getStationByCoord point stations = myStations
   where
     myStations :: Maybe Station
-    myStations = find (\a -> withinErrorPosition (getStationPosition a) p 1) stations
+    myStations = find (\a -> withinErrorPosition (getStationPosition a) point 1) stations
+
+getControlByCoord :: Point -> Maybe Control
+getControlByCoord point = foundControl
+  where
+    foundControl :: Maybe Control
+    foundControl = find (\(Control _ pos) -> withinErrorPosition pos point 0.5) controls
 
 handleClick :: Point -> GameState -> GameState
-handleClick point state@(GameState stations routes locos assets Play time) = turnConstructionOn
+handleClick point state@(GameState stations routes locos assets Play time) = withColorPicked
+  where
+    withColorPicked =
+      case getControlByCoord point of
+        Nothing -> state
+        Just (Control Train _) -> state
+        Just (Control Wagon _) -> state
+        Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+
+handleClick point state@(GameState stations routes locos assets (Construction color Nothing) time) = turnConstructionOn
   where
     turnConstructionOn =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations routes locos assets (Construction green (Just x)) time
+        Just x -> GameState stations routes locos assets (Construction color (Just x)) time
 
-handleClick _ state@(GameState _ _ _ _ (Construction _ Nothing) _) = state
+
 handleClick point state@(GameState stations routes locos assets (Construction color (Just startStation)) time) = turnConstructionOff
   where
     turnConstructionOff =
