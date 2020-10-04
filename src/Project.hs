@@ -139,7 +139,13 @@ handleClick point state@(GameState stations routes locos (Construction startStat
         Just x -> (GameState stations newRoutes locos Play time)
           where
             newRoutes :: [Route]
-            newRoutes = [Route brown (getStationPosition startStation) (getStationPosition x)] ++ routes
+            newRoutes = 
+              case (sameTargetStationRoutes) of
+                Nothing -> Route brown (getStationPosition startStation) (getStationPosition x) : routes
+                Just _ -> Route brown (getStationPosition x) (getStationPosition startStation) : routes
+
+            sameTargetStationRoutes :: Maybe Route
+            sameTargetStationRoutes = listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
 
 handleClick _ (GameState stations routes locos mode time) = (GameState stations routes locos mode time)
 
