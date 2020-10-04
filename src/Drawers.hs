@@ -1,5 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Drawers where 
+
+import qualified Data.Text              as Text   (pack)
+
 import Types
 import CodeWorld
 -- import CodeWorld.Image
@@ -131,3 +135,16 @@ drawControls (GameState _ _ _ assets _mode currentTime)
   where
     week = floor currentTime `div` 7
     isEnabled = week > length assets - 2 
+
+-- | Draws game state and additional notes
+-- | everything we need in the game is displayed according to the state
+-- | + additional information
+drawGameState :: GameState -> Picture
+drawGameState gameState =
+    renderObject drawStation (getStations gameState)
+    <> translated (-9) (-6) (lettering (Text.pack $ show (getCurrentMode gameState)))
+    -- <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
+    <> drawControls gameState
+    <> renderObject drawLocomotive (getLocomotives gameState)
+    <> renderObject drawRoute (getRoutes gameState)
+    <> backgroundImage

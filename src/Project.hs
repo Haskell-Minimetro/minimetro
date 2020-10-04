@@ -3,51 +3,53 @@
 
 module Project where
 
-import ActivityOfEnhancements
-import CodeWorld
-import Data.Fixed
-import Data.Text (pack)
-import Drawers
-import System.Random
+import qualified CodeWorld              as CW
+import qualified System.Random          as Random
+import qualified Data.Fixed             as Fixed
+import qualified Data.List              as List   (find)
+import qualified Data.Maybe             as Maybe  (listToMaybe)
+
+import qualified ActivityOfEnhancements as AOE
+import qualified Drawers
 import Types
-import Data.List (find)
-import Data.Maybe (listToMaybe)
-import Config
+import qualified Config
 
-drawGameState :: GameState -> Picture
-drawGameState gameState =
-  renderObject drawStation (getStations gameState)
-    <> translated (-9) (-6) (lettering (pack $ show (getCurrentMode gameState)))
-    -- <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
-    <> drawControls gameState
-    <> renderObject drawLocomotive (getLocomotives gameState)
-    <> renderObject drawRoute (getRoutes gameState)
-    <> backgroundImage
-
+-- | Update locomotive position if it is on Route
 updateLocomotivePosition :: Double -> Locomotive -> Locomotive
-updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
-  where
-    newProgress = calculateProgress direction progress dt speed
-    speed = 1 -- TODO: setup speed
+updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) 
+  = Locomotive passengers direction (OnRoute route newProgress)
+    where
+      newProgress = calculateProgress direction progress dt Config.locomotiveSpeed
 updateLocomotivePosition _dt locomotive = locomotive
 
-calculateProgress :: Direction -> Double -> Double -> Double -> Double
+-- | Calculate new progress of a locomotive being on route
+calculateProgress 
+  :: Direction -- locomotive's direction on route
+  -> Double    -- previous progress
+  -> Double    -- time passed
+  -> Double    -- locomotive's speed 
+  -> Double    -- new progress
 calculateProgress Forward progress dt speed = progress + dt * speed
 calculateProgress Backward progress dt speed = progress - dt * speed
 
+-- | Inverts direction
 inverseDirection :: Direction -> Direction
 inverseDirection Backward = Forward
 inverseDirection Forward = Backward
 
+-- | Estimates if 2 points are in the same neighbourhood (epsilon * epsilon)
 withinErrorPosition :: Position -> Position -> Double -> Bool
-withinErrorPosition (x, y) (x2, y2) epsilon = withinError x x2 epsilon && withinError y y2 epsilon
+withinErrorPosition (x1, y1) (x2, y2) epsilon 
+  =  withinError x1 x2 epsilon 
+  && withinError y1 y2 epsilon
 
-withinError :: Double -> Double -> Double -> Bool
+-- | Estimates if 2 Numbers are in the same neighbourhood
+withinError :: (Ord a, Num a) => a -> a -> a -> Bool
 withinError a b epsilon = abs (a - b) < epsilon
 
 withTimePassing :: forall world. Double -> Double -> (Double -> world -> world) -> (Double -> world -> world)
 withTimePassing currentTime threshold func
-  | currentTime `mod'` threshold < 0.05 = func
+  | currentTime `Fixed.mod'` threshold < 0.05 = func
   | otherwise = const id
 
 
@@ -60,7 +62,7 @@ nth n (_ : xs) = nth (n - 1) xs
 updateStation :: Double -> Station -> Station
 updateStation _dt (Station stationType pos passengers gen) = Station stationType pos newPassengers newGen
   where
-    (number, newGen) = randomR (0 :: Int, 1) gen
+    (number, newGen) = Random.randomR (0 :: Int, 1) gen
     newPassenger =
       case nth number (filter (\(Passenger x)-> x /= stationType ) possibleValues) of
         Just passenger -> passenger
@@ -111,7 +113,7 @@ transferPassangersToLocomotive locomotive@(Locomotive trainPassangers direction 
 transferPassangersToLocomotive locomotive station = (locomotive, station)
 
 
-routeFilter :: Color -> Position -> Route -> Bool
+routeFilter :: CW.Color -> Position -> Route -> Bool
 routeFilter color pos (Route routeColor pos1 _pos2) = color == routeColor && pos1 == pos
 
 getTransferRoute :: [Route] -> Locomotive -> Maybe (Route, Direction)
@@ -131,10 +133,10 @@ getTransferRoute routes (Locomotive _ direction (Ready pos color)) =
                     Nothing -> Nothing
   where
     getTransferForward :: Maybe Route
-    getTransferForward = find (\(Route routeColor pos1 _pos2) -> color == routeColor && pos1 == pos) routes
+    getTransferForward = List.find (\(Route routeColor pos1 _pos2) -> color == routeColor && pos1 == pos) routes
 
     getTransferBackward ::Maybe Route
-    getTransferBackward = find (\(Route routeColor _pos1 pos2) -> color == routeColor && pos2 == pos) routes
+    getTransferBackward = List.find (\(Route routeColor _pos1 pos2) -> color == routeColor && pos2 == pos) routes
 getTransferRoute _ _ = Nothing
 
 transferLocomotive :: [Route] -> Locomotive -> Locomotive
@@ -208,24 +210,24 @@ updateDynamic dt (GameState stations routes locomotives assets mode currentTime)
 
 -- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
-updateGameState :: Event -> GameState -> GameState
-updateGameState (PointerPress p) state = handleClick p state
-updateGameState (TimePassing dt) state = updateDynamic dt state
+updateGameState :: CW.Event -> GameState -> GameState
+updateGameState (CW.PointerPress p) state = handleClick p state
+updateGameState (CW.TimePassing dt) state = updateDynamic dt state
 updateGameState _ state = state
 
-getStationByCoord :: Point -> [Station] -> Maybe Station
+getStationByCoord :: CW.Point -> [Station] -> Maybe Station
 getStationByCoord point stations = myStations
   where
     myStations :: Maybe Station
-    myStations = find (\a -> withinErrorPosition (getStationPosition a) point 1) stations
+    myStations = List.find (\a -> withinErrorPosition (getStationPosition a) point 1) stations
 
-getControlByCoord :: Point -> Maybe Control
+getControlByCoord :: CW.Point -> Maybe Control
 getControlByCoord point = foundControl
   where
     foundControl :: Maybe Control
-    foundControl = find (\(Control _ pos) -> withinErrorPosition pos point 0.5) controls
+    foundControl = List.find (\(Control _ pos) -> withinErrorPosition pos point 0.5) Config.controls
 
-handleClick :: Point -> GameState -> GameState
+handleClick :: CW.Point -> GameState -> GameState
 handleClick point state@(GameState stations routes locos assets Play time) = withColorPicked
   where
     withColorPicked =
@@ -258,24 +260,24 @@ handleClick point state@(GameState stations routes locos assets (Construction co
                 Just _ -> Route color (getStationPosition x) (getStationPosition startStation) : routes
 
             sameTargetStationRoutes :: Maybe Route
-            sameTargetStationRoutes = listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
+            sameTargetStationRoutes = Maybe.listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
 
 handleClick _ (GameState stations routes locos assets mode time) = GameState stations routes locos assets mode time
 
 initialSystem :: GameState
 initialSystem =
   GameState
-    [ Station Circle (3, 4) [] (mkStdGen 42),
+    [ Station Circle (3, 4) [] (Random.mkStdGen 42),
       --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
       --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
       --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
-      Station Rectangle (2, -6) [] (mkStdGen 41),
-      Station Triangle (-4, 2) [] (mkStdGen 40),
-      Station Triangle (4, 2) [] (mkStdGen 40)
+      Station Rectangle (2, -6) [] (Random.mkStdGen 41),
+      Station Triangle (-4, 2) [] (Random.mkStdGen 40),
+      Station Triangle (4, 2) [] (Random.mkStdGen 40)
     ]
-    [Route brown (3, 4) (2, -6), Route brown (2, -6) (-4, 2)]
-    [Locomotive [] Forward (Ready (3,4) brown)]
-    [Asset (LineColor brown) (IsUsed True), Asset Train (IsUsed True)]
+    [Route CW.brown (3, 4) (2, -6), Route CW.brown (2, -6) (-4, 2)]
+    [Locomotive [] Forward (Ready (3,4) CW.brown)]
+    [Asset (LineColor CW.brown) (IsUsed True), Asset Train (IsUsed True)]
     Play
     0
 
@@ -284,25 +286,29 @@ isGameOver state = stationsAreFull (getStations state)
   where
     stationsAreFull :: [Station] -> Bool
     stationsAreFull [] = False
-    stationsAreFull (first : rest) = length (getStationPassengers first) >= maxPassangers || stationsAreFull rest
+    stationsAreFull (first : rest) = length (getStationPassengers first) >= Config.maxPassangers || stationsAreFull rest
 
 -- TODO: Maybe some better showage that its over
-withGameOver :: forall world. (world -> Bool) -> ActivityOf world -> ActivityOf world
+withGameOver 
+  :: forall world
+  . (world -> Bool) 
+  -> AOE.ActivityOf world 
+  -> AOE.ActivityOf world
 withGameOver isOver originalActivityOf userWorld userHandler userDrawer =
   originalActivityOf userWorld ignoreInput updatedDrawer
   where
-    ignoreInput :: Event -> world -> world
+    ignoreInput :: CW.Event -> world -> world
     ignoreInput event state
       | isOver state = state
       | otherwise = userHandler event state
 
-    updatedDrawer :: world -> Picture
+    updatedDrawer :: world -> CW.Picture
     updatedDrawer state
-      | isOver state = translated 9 9 (lettering "Game Over") <> userDrawer state
+      | isOver state = CW.translated 9 9 (CW.lettering "Game Over") <> userDrawer state
       | otherwise = userDrawer state
 
 run2 :: IO ()
-run2 = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState
+run2 = withGameOver isGameOver (AOE.withStartScreen (AOE.withReset CW.activityOf)) initialSystem updateGameState Drawers.drawGameState
 
 run :: IO ()
-run = debugActivityOf initialSystem updateGameState drawGameState
+run = CW.debugActivityOf initialSystem updateGameState Drawers.drawGameState

@@ -1,4 +1,5 @@
 module Types where
+
 import qualified CodeWorld as CW
 import qualified System.Random as Random
 
@@ -55,9 +56,9 @@ data Locomotive = Locomotive {
 
 -- | Route with its color, start and stop station positions
 data Route = Route {
-                    color   :: CW.Color, 
-                    from    :: Position, 
-                    to      :: Position
+                    getRouteColor   :: CW.Color, 
+                    routeStart      :: Position, 
+                    routeStop       :: Position
                     } deriving (Show)
 
 -- | GameMode

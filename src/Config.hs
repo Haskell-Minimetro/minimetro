@@ -8,6 +8,9 @@ maxPassangers = 30
 maxPassengersOnTrain :: Int
 maxPassengersOnTrain = 6
 
+locomotiveSpeed :: Double
+locomotiveSpeed = 1
+
 lineColors :: [Color]
 lineColors = [brown, red, blue, green]
 
