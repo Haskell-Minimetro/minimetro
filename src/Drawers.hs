@@ -2,16 +2,7 @@
 module Drawers where 
 import Types
 import CodeWorld
--- import CodeWorld.Image
 import Config
--- import Data.Text (pack)
--- import qualified Data.Text as T
-
--- trainEmoji :: Picture
--- trainEmoji = image "train" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/train_1f686.png" 16 16
-
--- wagonEmoji :: Picture
--- wagonEmoji = image "wagon" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/railway-car_1f683.png" 16 16
 
 backgroundImage :: Picture
 backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
@@ -120,10 +111,8 @@ drawAssetType Wagon = lettering "🚟" <> defaultControlBackground
 drawControlsRecursion :: [Control] -> Bool -> Picture
 drawControlsRecursion [] _ = blank
 drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
-  = translated x y (scaled scaleFactor scaleFactor (drawAssetType assetType))
+  = translated x y (drawAssetType assetType)
   <> drawControlsRecursion rest isEnabled
-  where
-    scaleFactor = if isEnabled then 1 else 0.3
 
 drawControls :: GameState -> Picture
 drawControls (GameState _ _ _ assets _mode currentTime) 
@@ -131,5 +120,5 @@ drawControls (GameState _ _ _ assets _mode currentTime)
   -- = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
   -- <> lettering mode
   where
-    week = floor (currentTime / 10)
-    isEnabled = week > length assets - 3
+    week = floor currentTime `div` 7
+    isEnabled = week > length assets - 2 
