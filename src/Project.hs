@@ -7,7 +7,6 @@ import qualified CodeWorld              as CW
 import qualified System.Random          as Random
 import qualified Data.Fixed             as Fixed
 import qualified Data.List              as List   (find)
-import qualified Data.Maybe             as Maybe  (listToMaybe)
 
 import qualified ActivityOfEnhancements as AOE
 import qualified Drawers
@@ -172,7 +171,6 @@ updateTime :: Double -> Double -> GameMode -> Double
 updateTime currentTime dt Play = currentTime + dt
 updateTime currentTime _ _ = currentTime
 
--- TODO: passanger setting on the train
 transferPassengersHelper :: [Locomotive] -> Station -> ([Locomotive], Station)
 transferPassengersHelper [] station = ([], station)
 transferPassengersHelper (locomotive:rest) station = (newLocomotive:nextLocomotives, nextStation)
@@ -198,8 +196,7 @@ transferPassengers trains (first:rest) = (updatedTrains, updatesStations)
 updateDynamic :: Double -> GameState -> GameState
 updateDynamic dt (GameState stations routes locomotives assets mode currentTime) = newState
   where
-    updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives -- Some filter on routes/locomotives
-    -- TODO: transferPassangersFromStation . transferPassangersToStation 
+    updatedLocomotives = map (stopLocomotive stations . updateLocomotivePosition dt . transferLocomotive routes) locomotives
     newTime = updateTime currentTime dt mode
 
     updatedStations = map (withTimePassing currentTime 2 updateStation dt) stations
@@ -208,7 +205,6 @@ updateDynamic dt (GameState stations routes locomotives assets mode currentTime)
     newState = GameState transferredStations routes transferredLocomotives assets mode newTime
 
 
--- TODO: Creation of routes by point click
 -- TODO: addition of locomotive by point and click
 updateGameState :: CW.Event -> GameState -> GameState
 updateGameState (CW.PointerPress p) state = handleClick p state
@@ -228,14 +224,17 @@ getControlByCoord point = foundControl
     foundControl = List.find (\(Control _ pos) -> withinErrorPosition pos point 0.5) Config.controls
 
 handleClick :: CW.Point -> GameState -> GameState
-handleClick point state@(GameState stations routes locos assets Play time) = withColorPicked
-  where
-    withColorPicked =
-      case getControlByCoord point of
-        Nothing -> state
-        Just (Control Train _) -> state
-        Just (Control Wagon _) -> state
-        Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
+handleClick point state@(GameState stations routes locos assets Play time) 
+  = if isEnabled then  withColorPicked else state
+    where
+      week = floor (time / 10)
+      isEnabled = week > length assets - 3
+      withColorPicked =
+        case getControlByCoord point of
+          Nothing -> state
+          Just (Control Train _) -> state
+          Just (Control Wagon _) -> state
+          Just (Control (LineColor color) _) -> GameState stations routes locos assets (Construction color Nothing) time
 
 handleClick point state@(GameState stations routes locos assets (Construction color Nothing) time) = turnConstructionOn
   where
@@ -250,30 +249,59 @@ handleClick point state@(GameState stations routes locos assets (Construction co
     turnConstructionOff =
       case getStationByCoord point (getStations state) of
         Nothing -> state
-        Just x -> GameState stations newRoutes locos assets Play time
+        Just secondStation -> GameState stations newRoutes locos newAssets Play time
           where
-            newRoutes :: [Route]
-            -- TODO: remove color hardcode
+            newAssets = Asset (LineColor color) (IsUsed True) : assets
             newRoutes = 
-              case (sameTargetStationRoutes) of
-                Nothing -> Route color (getStationPosition startStation) (getStationPosition x) : routes
-                Just _ -> Route color (getStationPosition x) (getStationPosition startStation) : routes
+              case createNewRoute routes color startStation secondStation of
+                Nothing -> routes
+                Just route -> route : routes
 
-            sameTargetStationRoutes :: Maybe Route
-            sameTargetStationRoutes = Maybe.listToMaybe $ (filter (\(Route _ routePos1 _) -> (withinErrorPosition (getStationPosition startStation) routePos1 1)) routes)
+handleClick _ state = state
 
-handleClick _ (GameState stations routes locos assets mode time) = GameState stations routes locos assets mode time
+createNewRoute :: [Route] -> CW.Color -> Station -> Station -> Maybe Route
+createNewRoute routes routeColor firstStation secondStation = newRoute
+  where
+    filteredRoutes = filter (\(Route color _ _ ) -> color == routeColor) routes
+
+    firstPos = getStationPosition firstStation
+    secondPos = getStationPosition secondStation
+    
+    routesIn posToCheck = filter (\(Route _ _ pos2) -> pos2 == posToCheck) filteredRoutes
+    routesOut posToCheck = filter (\(Route _ pos1 _) -> pos1 == posToCheck) filteredRoutes
+
+    routesInFirstPos = length (routesIn firstPos)
+    routesOutFirstPos = length (routesOut firstPos)
+    routesInSecondPos = length (routesIn secondPos)
+    routesOutSecondPos = length (routesOut secondPos)
+
+    sumFirstPos = routesInFirstPos + routesOutFirstPos
+    sumSecondPos = routesInSecondPos + routesOutSecondPos
+
+    newRoute
+      | firstPos == secondPos = Nothing -- First case, positions are the same - we can't do that
+      | sumFirstPos == 0 && sumSecondPos == 0 = Just (Route routeColor firstPos secondPos) -- Second case, both points have no routes, we just create new one
+      | sumFirstPos == 2 || sumSecondPos == 2 = Nothing -- Third case, at least one of the points have in and out, we can't create a new route
+
+      | sumFirstPos == 0 && routesInSecondPos == 1 = Just (Route routeColor secondPos firstPos)
+      | sumFirstPos == 0 && routesOutSecondPos == 1 = Just (Route routeColor firstPos secondPos)
+
+      | routesInFirstPos == 1 && (sumSecondPos == 0 || routesOutSecondPos == 1) = Just (Route routeColor firstPos secondPos)
+      | routesInFirstPos == 1 && routesInSecondPos == 1 = Nothing
+
+      | routesOutFirstPos == 1 && (sumSecondPos == 0 || routesInSecondPos == 1) = Just (Route routeColor secondPos firstPos)
+      | routesOutFirstPos == 1 && routesOutSecondPos == 1 = Nothing
+      
+      | otherwise = Nothing
 
 initialSystem :: GameState
 initialSystem =
   GameState
-    [ Station Circle (3, 4) [] (Random.mkStdGen 42),
-      --  [Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle,
-      --  Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle,
-      --  Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle ,Passenger Circle, Passenger Rectangle, Passenger Triangle, Passenger Circle, Passenger Rectangle, Passenger Triangle],
+    [ 
+      Station Circle    (3, 4)  [] (Random.mkStdGen 42),
       Station Rectangle (2, -6) [] (Random.mkStdGen 41),
-      Station Triangle (-4, 2) [] (Random.mkStdGen 40),
-      Station Triangle (4, 2) [] (Random.mkStdGen 40)
+      Station Triangle  (-4, 2) [] (Random.mkStdGen 40),
+      Station Triangle  (4, 2)  [] (Random.mkStdGen 39)
     ]
     [Route CW.brown (3, 4) (2, -6), Route CW.brown (2, -6) (-4, 2)]
     [Locomotive [] Forward (Ready (3,4) CW.brown)]

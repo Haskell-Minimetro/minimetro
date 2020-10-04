@@ -39,6 +39,7 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
+allow-newer: true
 extra-deps:
 - codeworld-api-0.3.1
 - blank-canvas-0.6.3@sha256:9c089fd7796e07e428f3490b3812c92fec8d3b615b12c80db7f282b5d6eeec95,7669

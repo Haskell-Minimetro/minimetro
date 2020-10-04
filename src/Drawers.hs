@@ -2,91 +2,81 @@
 
 module Drawers where 
 
-import qualified Data.Text              as Text   (pack)
+import qualified Data.Text as Text   (pack)
+import qualified CodeWorld as CW
+import           Types
+import           Config
 
-import Types
-import CodeWorld
--- import CodeWorld.Image
-import Config
--- import Data.Text (pack)
--- import qualified Data.Text as T
-
--- trainEmoji :: Picture
--- trainEmoji = image "train" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/train_1f686.png" 16 16
-
--- wagonEmoji :: Picture
--- wagonEmoji = image "wagon" "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/railway-car_1f683.png" 16 16
-
-backgroundImage :: Picture
-backgroundImage = colored (lighter 0.5 brown) (solidRectangle 100 100)
+backgroundImage :: CW.Picture
+backgroundImage = CW.colored (CW.lighter 0.5 CW.brown) (CW.solidRectangle 100 100)
 
 
-drawStationType :: StationType -> Picture
+drawStationType :: StationType -> CW.Picture
 drawStationType Triangle =
-  scaled 0.85 0.85 (colored white (drawFigure TriangleFigure))
-  <> colored black (drawFigure TriangleFigure)
+  CW.scaled 0.85 0.85 (CW.colored CW.white (drawFigure TriangleFigure))
+  <> CW.colored CW.black (drawFigure TriangleFigure)
 drawStationType Rectangle =
-  scaled 0.85 0.85 (colored white (drawFigure SquareFigure))
-  <> colored black (drawFigure SquareFigure)
+  CW.scaled 0.85 0.85 (CW.colored CW.white (drawFigure SquareFigure))
+  <> CW.colored CW.black (drawFigure SquareFigure)
 drawStationType Circle =
-  scaled 0.85 0.85 (colored white (drawFigure CircleFigure))
-  <> colored black (drawFigure CircleFigure)
+  CW.scaled 0.85 0.85 (CW.colored CW.white (drawFigure CircleFigure))
+  <> CW.colored CW.black (drawFigure CircleFigure)
 
-drawPassanger :: Passenger -> Picture
-drawPassanger (Passenger Triangle) = scaled 0.2 0.2 (drawFigure TriangleFigure)
-drawPassanger (Passenger Rectangle) = scaled 0.2 0.2 (drawFigure SquareFigure)
-drawPassanger (Passenger Circle) = scaled 0.2 0.2 (drawFigure CircleFigure)
+drawPassanger :: Passenger -> CW.Picture
+drawPassanger (Passenger Triangle) = CW.scaled 0.2 0.2 (drawFigure TriangleFigure)
+drawPassanger (Passenger Rectangle) = CW.scaled 0.2 0.2 (drawFigure SquareFigure)
+drawPassanger (Passenger Circle) = CW.scaled 0.2 0.2 (drawFigure CircleFigure)
 
 -- TODO: fix this triangle draw wrong
-drawFigure :: Figure -> Picture
+drawFigure :: Figure -> CW.Picture
 drawFigure TriangleFigure = triangle
   where
-    triangle = solidPolygon [(-triangleSize/2, -(median-radius)), (0, radius), (triangleSize/2, -(median-radius))]
+    triangle = CW.solidPolygon [(-triangleSize/2, -(median-radius)), (0, radius), (triangleSize/2, -(median-radius))]
     triangleSize = 1.2
     radius = triangleSize * sqrt 3/3
     median = sqrt 3 * triangleSize / 2
 
-drawFigure SquareFigure = solidRectangle 1 1
-drawFigure CircleFigure = solidCircle 0.5
+drawFigure SquareFigure = CW.solidRectangle 1 1
+drawFigure CircleFigure = CW.solidCircle 0.5
 
-drawCurrentDate :: Double -> Picture
-drawCurrentDate _time = blank
+drawCurrentDate :: Double -> CW.Picture
+drawCurrentDate _time = CW.blank
 
 
 
-drawStation :: Station -> Picture
+drawStation :: Station -> CW.Picture
 drawStation (Station stationType (x, y) passangers _) 
-  = translated x y (drawStationType stationType) <> drawPassengersOnStation (x, y) passangers
+  = CW.translated x y (drawStationType stationType) <> drawPassengersOnStation (x, y) passangers
 
 
-drawInARow :: [a] -> Double -> (a->Picture) -> Picture
-drawInARow [] _ _ = blank
+drawInARow :: [a] -> Double -> (a->CW.Picture) -> CW.Picture
+drawInARow [] _ _ = CW.blank
 drawInARow (first:rest) margin drawer = 
   drawer first
-  <> translated margin 0 (drawInARow rest margin drawer)
+  <> CW.translated margin 0 (drawInARow rest margin drawer)
 
-drawPassengersOnStation :: Position -> [Passenger] -> Picture
-drawPassengersOnStation (x, y) passengers = translated (x+0.5) (y+0.5) (passes passengers)
+drawPassengersOnStation :: Position -> [Passenger] -> CW.Picture
+drawPassengersOnStation (x, y) passengers = CW.translated (x+0.5) (y+0.5) (passes passengers)
   where
-    passes :: [Passenger] -> Picture
-    passes [] = blank
-    passes passenger = drawInARow (take 10 passenger) 0.25 drawPassanger <> translated 0 0.25 (passes (drop 10 passenger))
+    passes :: [Passenger] -> CW.Picture
+    passes [] = CW.blank
+    passes passenger = drawInARow (take 10 passenger) 0.25 drawPassanger <> CW.translated 0 0.25 (passes (drop 10 passenger))
 
 
 -- | Render a list of given objects by a given function
-renderObject :: (a -> Picture) -> [a] -> Picture
-renderObject func = pictures . map func
+renderObject :: (a -> CW.Picture) -> [a] -> CW.Picture
+renderObject func = CW.pictures . map func
 
 
-drawRoute :: Route -> Picture
-drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positions) -- <> translated x y (colored red $ solidCircle 0.7)
+drawRoute :: Route -> CW.Picture
+drawRoute (Route color station1 station2) = CW.colored color (CW.thickCurve 0.3 positions) -- <> CW.translated x y (CW.colored red $ CW.solidCircle 0.7)
   where
     positions = [station1, station2]
 
-drawLocomotive :: Locomotive -> Picture
+drawLocomotive :: Locomotive -> CW.Picture
 drawLocomotive (Locomotive trainPassangers _direction others) = drawing
-  -- <> translated (-9) (-8) (lettering (pack $ show  direction))
-  -- <> translated (-9) (-9) (lettering (pack $ show  others))
+  -- <> CW.translated (-9) (-8) (lettering (pack $ show  direction))
+  -- <> CW.translated (-9) (-9) (lettering (pack $ show  others))
   where
     drawing =
       case others of 
@@ -94,9 +84,9 @@ drawLocomotive (Locomotive trainPassangers _direction others) = drawing
         TransferTo pos color -> baseDrawing pos 0 color
         TransferFrom pos color -> baseDrawing pos 0 color
         Ready pos color -> baseDrawing pos 0 color
-    baseDrawing (x, y) rotation color =  translated x y (rotated rotation (passengers color <> locomotiveBase color))
-    locomotiveBase locomotiveColor = colored (light locomotiveColor) (solidRectangle 0.66 1)
-    passengers locomotiveColor = translated (-0.13) (-0.25) (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
+    baseDrawing (x, y) rotation color =  CW.translated x y (CW.rotated rotation (passengers color <> locomotiveBase color))
+    locomotiveBase locomotiveColor = CW.colored (CW.light locomotiveColor) (CW.solidRectangle 0.66 1)
+    passengers locomotiveColor = CW.translated (-0.13) (-0.25) (CW.colored (CW.lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
       
 
 getTrainPositionWithProgress :: Double -> Position -> Position -> Position
@@ -106,32 +96,32 @@ getAngle :: Position -> Position -> Double
 getAngle (x1, y1) (x2, y2) = atan ((y1 - y2) / (x1 - x2))
 
 
-drawPassengersOnTrain :: [Passenger] -> Picture
-drawPassengersOnTrain [] = blank
-drawPassengersOnTrain passenger = drawInARow (take 2 passenger) 0.25 drawPassanger <> translated 0 0.25 (drawPassengersOnTrain (drop 2 passenger))
+drawPassengersOnTrain :: [Passenger] -> CW.Picture
+drawPassengersOnTrain [] = CW.blank
+drawPassengersOnTrain passenger = drawInARow (take 2 passenger) 0.25 drawPassanger <> CW.translated 0 0.25 (drawPassengersOnTrain (drop 2 passenger))
 
 
-defaultControlBackground :: Picture
-defaultControlBackground = colored gray (solidCircle 0.65) <> colored (dark gray) (solidCircle 0.75)
+defaultControlBackground :: CW.Picture
+defaultControlBackground = CW.colored CW.gray (CW.solidCircle 0.65) <> CW.colored (CW.dark CW.gray) (CW.solidCircle 0.75)
 
-drawAssetType :: AssetType -> Picture
+drawAssetType :: AssetType -> CW.Picture
 drawAssetType (LineColor backgroundColor) 
-  = colored backgroundColor (solidCircle 0.65)
-  <> colored (dark backgroundColor) (solidCircle 0.75)
-drawAssetType Train = lettering "🚅" <> defaultControlBackground
-drawAssetType Wagon = lettering "🚟" <> defaultControlBackground
+  = CW.colored backgroundColor (CW.solidCircle 0.65)
+  <> CW.colored (CW.dark backgroundColor) (CW.solidCircle 0.75)
+drawAssetType Train = CW.lettering "🚅" <> defaultControlBackground
+drawAssetType Wagon = CW.lettering "🚟" <> defaultControlBackground
 
-drawControlsRecursion :: [Control] -> Bool -> Picture
-drawControlsRecursion [] _ = blank
+drawControlsRecursion :: [Control] -> Bool -> CW.Picture
+drawControlsRecursion [] _ = CW.blank
 drawControlsRecursion ((Control assetType (x, y)):rest) isEnabled
-  = translated x y (drawAssetType assetType)
+  = CW.translated x y (drawAssetType assetType)
   <> drawControlsRecursion rest isEnabled
 
-drawControls :: GameState -> Picture
+drawControls :: GameState -> CW.Picture
 drawControls (GameState _ _ _ assets _mode currentTime) 
   = drawControlsRecursion controls isEnabled
-  -- = translated translateFactor 0 $ scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
-  -- <> lettering mode
+  -- = translated translateFactor 0 $ CW.scaled scaleFactor scaleFactor $ drawInARow lineColors 2 drawControl
+  -- <> CW.lettering mode
   where
     week = floor currentTime `div` 7
     isEnabled = week > length assets - 2 
@@ -139,11 +129,11 @@ drawControls (GameState _ _ _ assets _mode currentTime)
 -- | Draws game state and additional notes
 -- | everything we need in the game is displayed according to the state
 -- | + additional information
-drawGameState :: GameState -> Picture
+drawGameState :: GameState -> CW.Picture
 drawGameState gameState =
-    renderObject drawStation (getStations gameState)
-    <> translated (-9) (-6) (lettering (Text.pack $ show (getCurrentMode gameState)))
-    -- <> translated (-9) (-4) (lettering (pack $ show (length (getRoutes gameState))))
+  renderObject drawStation (getStations gameState)
+    <> CW.translated (-9) (-6) (CW.lettering (Text.pack $ show (getCurrentMode gameState)))
+    <> CW.translated (-9) (-4) (CW.lettering (Text.pack $ show (length (getRoutes gameState))))
     <> drawControls gameState
     <> renderObject drawLocomotive (getLocomotives gameState)
     <> renderObject drawRoute (getRoutes gameState)
