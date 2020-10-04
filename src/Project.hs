@@ -53,12 +53,23 @@ withTimePassing currentTime threshold func
   | currentTime `mod'` threshold < 0.05 = func
   | otherwise = const id
 
+
+nth :: Int -> [a] -> Maybe a
+nth _ []       = Nothing
+nth 1 (x : _)  = Just x
+nth n (_ : xs) = nth (n - 1) xs
+
 -- TODO: add exponential grow of appearance of new passengers
 updateStation :: Double -> Station -> Station
 updateStation _dt (Station stationType pos passengers gen) = Station stationType pos newPassengers newGen
   where
-    (number, newGen) = randomR (0 :: Int, 2) gen
-    newPassengers = passengers ++ [getRandomPassenger number]
+    (number, newGen) = randomR (0 :: Int, 1) gen
+    newPassenger =
+      case nth number (filter (\(Passenger x)-> x /= stationType ) possibleValues) of
+        Just passenger -> passenger
+        Nothing -> Passenger Circle
+    possibleValues = [Passenger Triangle, Passenger Rectangle, Passenger Circle]
+    newPassengers = passengers ++ [newPassenger]
 
 getRandomPassenger :: Int -> Passenger
 getRandomPassenger 0 = Passenger Triangle
@@ -80,7 +91,7 @@ transferPassangersToStation locomotive@(Locomotive passengers direction (Transfe
   | checkTransfer locomotive station = (updatedLocomotive, updatedStation)
   | otherwise = (locomotive, station)
   where
-    trainPassangers = map Passenger (filter (==stationType) (map (\(Passenger x) -> x) passengers))
+    trainPassangers = map Passenger (filter (/=stationType) (map (\(Passenger x) -> x) passengers))
     stationType = getStationType station
 
     updatedLocomotive = Locomotive trainPassangers direction (TransferFrom position color)
