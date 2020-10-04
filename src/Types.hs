@@ -36,8 +36,13 @@ data Locomotive = Locomotive {
                               getLocomotiveStatus          :: StationStatus
                               }
 
-data Route = Route Color Position Position
-  deriving (Show)
+data Route = Route {
+  getColor :: Color,
+  from :: Position,
+  to :: Position
+} deriving (Eq, Show)
+
+
 data GameMode = Play | Construction Station | GameOver
   deriving (Show)
 
