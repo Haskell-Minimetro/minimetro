@@ -26,18 +26,27 @@ drawGameState gameState =
 updateLocomotivePosition :: Double -> Locomotive -> Locomotive
 updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
   where
-    newProgress = calculateProgress direction progress dt locomotiveSpeed
+    newProgress = calculateProgress direction progress dt locomotiveSpeed route
 updateLocomotivePosition _dt locomotive = locomotive -- If the locomotive isn't 'OnRoute' we don't update its position
 
+-- | Calculate L2 distance between two positions
+calculateDistance ::
+  Position    -- First position
+  -> Position -- Second position
+  -> Double   -- Distance between two positions
+calculateDistance (x1,y1) (x2,y2) = sqrt ((x1-x2)^2+(y1-y2)^2)
+
 -- | Calculate the progress on the route of the locomotive
+-- The progress depends on speed of the locomotive and distance between stations
 calculateProgress ::
   Direction -- Direction of the locomotive
   -> Double -- Current progress of the locomotive
   -> Double -- Time delta
   -> Double -- Speed of the locomotive
+  -> Route  -- Route locomotive follows
   -> Double -- New progress towards the station
-calculateProgress Forward progress dt speed = progress + dt * speed
-calculateProgress Backward progress dt speed = progress - dt * speed
+calculateProgress Forward progress dt speed (Route _ pos1 pos2) = progress + dt * speed / calculateDistance pos1 pos2 -- progress = t * speed / distance
+calculateProgress Backward progress dt speed (Route _ pos1 pos2) = progress - dt * speed / calculateDistance pos1 pos2
 
 -- | Inverses the direction
 inverseDirection :: Direction -> Direction
@@ -352,7 +361,8 @@ createNewRoute routes routeColor firstStation secondStation = newRoute
 
     newRoute
       | firstPos == secondPos = Nothing -- First case, positions are the same - we can't do that
-      | sumFirstPos == 0 && sumSecondPos == 0  && null filteredRoutes = Just (Route routeColor firstPos secondPos) -- Second case, both points have no routes, we just create new one
+       -- Second case, both points have no routes, we just create new one. But only if there are no previously created routes
+      | sumFirstPos == 0 && sumSecondPos == 0  && null filteredRoutes = Just (Route routeColor firstPos secondPos)
       | sumFirstPos == 2 || sumSecondPos == 2 = Nothing -- Third case, at least one of the points have in and out, we can't create a new route
 
       -- Others cases are hard to describe. The basic idea that every node should have at most Input route and one Output route
