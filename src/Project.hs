@@ -191,7 +191,7 @@ updateTime ::
   -> GameMode -- Current game mode
   -> Double -- new Time
 updateTime currentTime dt Play = currentTime + dt
-updateTime currentTime _ _ = currentTime
+updateTime currentTime dt _ = currentTime + dt
 
 -- | Helper function that helps moving passengers from and to stations
 transferPassengersHelper :: [Locomotive] -> Station -> ([Locomotive], Station)
@@ -352,7 +352,7 @@ createNewRoute routes routeColor firstStation secondStation = newRoute
 
     newRoute
       | firstPos == secondPos = Nothing -- First case, positions are the same - we can't do that
-      | sumFirstPos == 0 && sumSecondPos == 0 = Just (Route routeColor firstPos secondPos) -- Second case, both points have no routes, we just create new one
+      | sumFirstPos == 0 && sumSecondPos == 0  && null filteredRoutes = Just (Route routeColor firstPos secondPos) -- Second case, both points have no routes, we just create new one
       | sumFirstPos == 2 || sumSecondPos == 2 = Nothing -- Third case, at least one of the points have in and out, we can't create a new route
 
       -- Others cases are hard to describe. The basic idea that every node should have at most Input route and one Output route
