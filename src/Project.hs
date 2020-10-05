@@ -13,6 +13,8 @@ import Types
 import Data.List (find)
 import Config
 
+import Data.Maybe (listToMaybe)
+
 -- | Main function that draw State of the Game
 drawGameState :: GameState -> Picture
 drawGameState gameState =
@@ -24,7 +26,7 @@ drawGameState gameState =
 
 -- | Updates locomotive position given timedelta and the locomotive itself
 updateLocomotivePosition :: Double -> Locomotive -> Locomotive
-updateLocomotivePosition dt (Locomotive passengers direction (OnRoute route progress)) = Locomotive passengers direction (OnRoute route newProgress)
+updateLocomotivePosition dt (Locomotive cap passengers direction (OnRoute route progress)) = Locomotive cap passengers direction (OnRoute route newProgress)
   where
     newProgress = calculateProgress direction progress dt locomotiveSpeed
 updateLocomotivePosition _dt locomotive = locomotive -- If the locomotive isn't 'OnRoute' we don't update its position
@@ -98,37 +100,37 @@ checkTransfer locomotive station =
 -- TODO: the state of the station may change for transfers, but not for now
 -- | Transfer passengers from locomtoive to station (if they are in the same position)
 transferPassangersToStation :: Locomotive -> Station -> (Locomotive, Station)
-transferPassangersToStation locomotive@(Locomotive passengers direction (TransferTo position color)) station
+transferPassangersToStation locomotive@(Locomotive cap passengers direction (TransferTo position color)) station
   | checkTransfer locomotive station = (updatedLocomotive, updatedStation) -- Check same position
   | otherwise = (locomotive, station)
   where
     trainPassangers = map Passenger (filter (/=stationType) (map (\(Passenger x) -> x) passengers)) -- Remove all passengers that are the same symbol as the station
     stationType = getStationType station
 
-    updatedLocomotive = Locomotive trainPassangers direction (TransferFrom position color)
+    updatedLocomotive = Locomotive cap trainPassangers direction (TransferFrom position color)
     updatedStation = station
 transferPassangersToStation locomotive station = (locomotive, station)
 
 -- | Transfer passengers from station to locomotive (if they are in the same position)
 transferPassangersToLocomotive :: Locomotive -> Station -> (Locomotive, Station)
-transferPassangersToLocomotive locomotive@(Locomotive trainPassangers direction (TransferFrom position color)) station
+transferPassangersToLocomotive locomotive@(Locomotive capacity trainPassangers direction (TransferFrom position color)) station
   | checkTransfer locomotive station = (updatedLocomotive, updatedStation) -- Check same position
   | otherwise = (locomotive, station)
   where
     stationPassengers = getStationPassengers station
-    maxToTransfer = maxPassengersOnTrain - length trainPassangers
+    maxToTransfer = capacity - length trainPassangers
 
     newTrainPassangers = trainPassangers ++ take maxToTransfer stationPassengers
     newStationsPassengers = drop maxToTransfer stationPassengers
 
-    updatedLocomotive = Locomotive newTrainPassangers direction (Ready position color)
+    updatedLocomotive = Locomotive capacity newTrainPassangers direction (Ready position color)
     updatedStation = Station (getStationType station) (getStationPosition station) newStationsPassengers (getPassengerGen station)
 transferPassangersToLocomotive locomotive station = (locomotive, station)
 
 -- | Given list of possible routes and locomotive that is ready to move out from the station
 -- Tries to suggest to which route it should move
 getTransferRoute :: [Route] -> Locomotive -> Maybe (Route, Direction)
-getTransferRoute routes (Locomotive _ direction (Ready pos color)) =
+getTransferRoute routes (Locomotive _ _ direction (Ready pos color)) =
   case direction of 
     Forward -> -- Try to follow the same direction
       case getTransferForward of
@@ -154,13 +156,13 @@ getTransferRoute _ _ = Nothing
 
 -- | Given a list of possible routes and locomotive, moves the locomotive to this position
 transferLocomotive :: [Route] -> Locomotive -> Locomotive
-transferLocomotive routes locomotive@(Locomotive passagners _ (Ready _ _)) = newLocomotive
+transferLocomotive routes locomotive@(Locomotive cap passagners _ (Ready _ _)) = newLocomotive
   where
     whereToStart Backward = 1.0
     whereToStart Forward = 0.0
     newLocomotive = 
       case getTransferRoute routes locomotive of
-        Just (newRoute, newDirection) -> Locomotive passagners newDirection (OnRoute newRoute (whereToStart newDirection))
+        Just (newRoute, newDirection) -> Locomotive cap passagners newDirection (OnRoute newRoute (whereToStart newDirection))
         Nothing -> locomotive
 transferLocomotive _routes locomotive = locomotive
 
@@ -172,14 +174,14 @@ directionRouteToPos (Route _ pos1 _) Backward = pos1
 
 -- | Given the list of stations and locomotive, tries to see if locomotive have reached any of them
 stopLocomotive :: [Station] -> Locomotive -> Locomotive
-stopLocomotive stations locomotive@(Locomotive passengers direction (OnRoute route@(Route color _ _) progress))
+stopLocomotive stations locomotive@(Locomotive cap passengers direction (OnRoute route@(Route color _ _) progress))
   | progress > 1 =  -- If we reach one of the ends of the routes -> transfer to the station
     case getStationByCoord (directionRouteToPos route direction) stations of
-      Just station -> Locomotive passengers direction (TransferTo (getStationPosition station) color)
+      Just station -> Locomotive cap passengers direction (TransferTo (getStationPosition station) color)
       Nothing -> locomotive
   | progress < 0 = 
     case getStationByCoord (directionRouteToPos route direction) stations of
-      Just station -> Locomotive passengers direction (TransferTo (getStationPosition station) color)
+      Just station -> Locomotive cap passengers direction (TransferTo (getStationPosition station) color)
       Nothing -> locomotive
   | otherwise = locomotive
 stopLocomotive _stations locomotive = locomotive
@@ -257,10 +259,10 @@ getControlByCoord point =
 
 -- | Given locomotive, retrieves it's color
 getLocomotiveColor :: Locomotive -> Color
-getLocomotiveColor (Locomotive _ _ (Ready _ trainColor)) = trainColor
-getLocomotiveColor (Locomotive _ _ (TransferTo _ trainColor)) = trainColor
-getLocomotiveColor (Locomotive _ _ (TransferFrom _ trainColor)) = trainColor
-getLocomotiveColor (Locomotive _ _ (OnRoute (Route trainColor _ _) _)) = trainColor
+getLocomotiveColor (Locomotive _ _ _ (Ready _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ _ (TransferTo _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ _ (TransferFrom _ trainColor)) = trainColor
+getLocomotiveColor (Locomotive _ _ _ (OnRoute (Route trainColor _ _) _)) = trainColor
 
 -- | Removes all of AssetType from the game state
 removeAssetType :: AssetType -> GameState -> GameState
@@ -289,7 +291,8 @@ handleClick point state@(GameState stations routes locos Play time)
           Nothing -> state
           Just (Control Train _) ->
             if isAvailable Train then GameState stations routes locos Repopulation time else state
-          Just (Control Wagon _) -> state
+          Just (Control Wagon _) -> 
+            if isAvailable Wagon then GameState stations routes locos WagonAddition time else state
           Just (Control (LineColor color) _) ->
             if isAvailable (LineColor color) then GameState stations routes locos (Construction color Nothing) time else state
           Just (Removal assetType) -> removeAssetType assetType state
@@ -302,9 +305,33 @@ handleClick point state@(GameState stations routes locos Repopulation time)
       Just (Control Wagon _) -> state
       Just (Control (LineColor trainColor) _ ) -> case chosenRoute of 
           Nothing -> GameState stations routes locos Play time
-          Just (Route _ startPosition _) -> GameState stations routes (Locomotive [] Forward (Ready startPosition trainColor):locos) Play time
+          Just (Route _ startPosition _) -> GameState stations routes (Locomotive wagonCapacity [] Forward (Ready startPosition trainColor):locos) Play time
         where
           chosenRoute = find (\(Route color _ _ ) -> color == trainColor) routes
+
+handleClick _ (GameState stations routes [] WagonAddition time) = GameState stations routes [] Play time
+
+handleClick point state@(GameState stations routes locos WagonAddition time)
+  = case getControlByCoord point of 
+      Nothing -> state
+      Just (Removal _) -> state
+      Just (Control Train _) -> state
+      Just (Control Wagon _) -> state
+      Just (Control (LineColor trainColor) _ ) -> case chosenRoute of 
+          Nothing -> GameState stations routes locos Play time
+          Just Route {} -> case listToMaybe leftLocos of 
+            Nothing -> GameState stations routes locos Play time
+            Just loco -> GameState stations routes (drop 1 leftLocos ++ rightLocos ++ [newLoco loco] ) Play time
+        where
+          chosenRoute = find (\(Route color _ _ ) -> color == trainColor) routes
+
+          leftLocos :: [Locomotive]
+          leftLocos = dropWhile ((/=trainColor) . getLocomotiveColor) locos
+          
+          rightLocos :: [Locomotive]
+          rightLocos = takeWhile ((/=trainColor) . getLocomotiveColor) locos
+
+          newLoco l = Locomotive ((getLocomotiveCapacity l) + wagonCapacity) (getLocomotivePassengers l) (getLocomotiveDirection l) (getLocomotiveStatus l)
 
 handleClick point state@(GameState stations routes locos (Construction color Nothing) time) = turnConstructionOn
   where

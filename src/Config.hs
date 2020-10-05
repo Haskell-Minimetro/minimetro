@@ -6,8 +6,11 @@ import Types
 maxPassangers :: Int
 maxPassangers = 30
 
-maxPassengersOnTrain :: Int
-maxPassengersOnTrain = 6
+wagonCapacity :: Int
+wagonCapacity = 4
+
+-- maxPassengersOnTrain :: Int
+-- maxPassengersOnTrain = 6
 
 -- | What colors can be used for the lines
 lineColors :: [Color]
@@ -19,7 +22,7 @@ initialAmountOfAssets = 2
 
 -- | Default speed of the locomotive
 locomotiveSpeed :: Double
-locomotiveSpeed = 1
+locomotiveSpeed = 0.5
 
 -- | What control we have for the game
 controls :: [Control]
