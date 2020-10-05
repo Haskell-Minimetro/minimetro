@@ -77,15 +77,15 @@ drawLocomotive (Locomotive trainCapacity trainPassangers direction others) = dra
     drawing =
       case others of 
         OnRoute (Route color pos1 pos2) progress -> baseDrawing (getTrainPositionWithProgress progress pos1 pos2) (-(pi / 2 - getAngle pos1 pos2)) color
-        TransferTo pos color -> baseDrawing pos 0 color
-        TransferFrom pos color -> baseDrawing pos 0 color
-        Ready pos color -> baseDrawing pos 0 color
+        TransferTo _ _ -> blank
+        TransferFrom _ _ -> blank
+        Ready _ _ -> blank
     rot = case direction of
-      Forward -> 0
-      _ -> pi
+      Forward -> pi
+      _ -> 0
     baseDrawing (x, y) rotation color = translated x y (rotated (rotation+rot) (passengers color <> locomotiveBase color))
-    locomotiveBase locomotiveColor = translated 0 (trainLength/2) $ colored (light locomotiveColor) (solidRectangle 0.5 trainLength)
-    passengers locomotiveColor =  translated 0 0.25 (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
+    locomotiveBase locomotiveColor = translated 0 (trainLength/2-0.125) $ colored (light locomotiveColor) (solidRectangle 0.75 (trainLength+0.5))
+    passengers locomotiveColor =  translated (-0.125) 0 (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
 
     trainLength = wagonLength * numWagons
     wagonLength = fromIntegral (ceiling (fromIntegral wagonCapacity / 2.0)) * 0.25
@@ -143,9 +143,13 @@ amountOfLinesUsed state = length (getUniqueLinesColors (getRoutes state))
 amountOfTrainsUsed :: GameState -> Int
 amountOfTrainsUsed state = length (getLocomotives state)
 
+amountOfWagonsUsed :: GameState -> Int
+amountOfWagonsUsed state = ceiling $ fromIntegral (sum (map getLocomotiveCapacity (getLocomotives state))) / fromIntegral wagonCapacity
+      
+
 -- | Get current number of assets used
 getAmountOfAssetsUsed :: GameState -> Int
-getAmountOfAssetsUsed state = amountOfLinesUsed state + amountOfTrainsUsed state
+getAmountOfAssetsUsed state = amountOfLinesUsed state + amountOfWagonsUsed state
 
 -- | Get current week number
 getCurrentWeek :: Double -> Int
