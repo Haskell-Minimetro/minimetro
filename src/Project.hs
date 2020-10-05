@@ -12,7 +12,7 @@ import System.Random
 import Types
 import Data.List (find)
 import Config
-
+import Data.List
 -- | Main function that draw State of the Game
 drawGameState :: GameState -> Picture
 drawGameState gameState =
@@ -119,14 +119,9 @@ transferPassangersToLocomotive gamestate locomotive@(Locomotive trainPassangers 
     maxToTransfer = maxPassengersOnTrain - length trainPassangers
 
     eligablePassangers = filter (\(Passenger targetType) -> (testConnection gamestate station targetType)) stationPassengers
-
-    newTrainPassangers = trainPassangers ++ take maxToTransfer eligablePassangers
-    newStationsPassengers = filter (\p -> not(isMember p eligablePassangers)) stationPassengers
-
-    isMember _ [] = False
-    isMember n (x:xs)
-      | n == x = True
-      | otherwise = isMember n xs
+    movingPassangers = take maxToTransfer eligablePassangers
+    newTrainPassangers = trainPassangers ++ movingPassangers
+    newStationsPassengers = stationPassengers \\ movingPassangers
 
     updatedLocomotive = Locomotive newTrainPassangers direction (Ready position color)
     updatedStation = Station (getStationType station) (getStationPosition station) newStationsPassengers (getPassengerGen station)
