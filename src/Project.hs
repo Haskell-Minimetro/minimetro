@@ -96,18 +96,22 @@ checkTransfer locomotive station =
     (TransferFrom pos _) -> pos == getStationPosition station
 
 -- TODO: the state of the station may change for transfers, but not for now
--- | Transfer passengers from locomtoive to station (if they are in the same position)
-transferPassangersToStation :: Locomotive -> Station -> (Locomotive, Station)
-transferPassangersToStation locomotive@(Locomotive passengers direction (TransferTo position color)) station
+-- | Transfer passengers from locomtoive to station (if they are in the same position or there is no path to the target destination)
+transferPassangersToStation :: GameState -> Locomotive -> Station -> (Locomotive, Station)
+transferPassangersToStation gamestate locomotive@(Locomotive passengers direction (TransferTo position color)) station@(Station stationType pos stationPassengers gen)
   | checkTransfer locomotive station = (updatedLocomotive, updatedStation) -- Check same position
   | otherwise = (locomotive, station)
   where
-    trainPassangers = map Passenger (filter (/=stationType) (map (\(Passenger x) -> x) passengers)) -- Remove all passengers that are the same symbol as the station
-    stationType = getStationType station
+    gamestateWithoutWayBack = gamestate
+    unboardedPassangers = filter (\(Passenger passType) -> not (testConnection gamestateWithoutWayBack station passType)) passengers -- Remove all passengers that are not able to ride to the destination
+    
+    trainPassangers = filter (\passenger@(Passenger passType) -> (passType /= stationType) && passenger `notElem` unboardedPassangers) passengers -- Remove all passengers that are the same symbol as the station
+    _stationType = getStationType station
 
     updatedLocomotive = Locomotive trainPassangers direction (TransferFrom position color)
-    updatedStation = station
-transferPassangersToStation locomotive station = (locomotive, station)
+    updatedStation = Station stationType pos (stationPassengers ++ unboardedPassangers) gen
+
+transferPassangersToStation _ locomotive station = (locomotive, station)
 
 -- | Transfer passengers from station to locomotive (if they are in the same position)
 transferPassangersToLocomotive :: GameState -> Locomotive -> Station -> (Locomotive, Station)
@@ -118,7 +122,7 @@ transferPassangersToLocomotive gamestate locomotive@(Locomotive trainPassangers 
     stationPassengers = getStationPassengers station
     maxToTransfer = maxPassengersOnTrain - length trainPassangers
 
-    eligablePassangers = filter (\(Passenger targetType) -> (testConnection gamestate station targetType)) stationPassengers
+    eligablePassangers = filter (\(Passenger targetType) -> testConnection gamestate station targetType) stationPassengers
 
     newTrainPassangers = trainPassangers ++ take maxToTransfer eligablePassangers
     newStationsPassengers = filter (\p -> not(isMember p eligablePassangers)) stationPassengers
@@ -146,7 +150,7 @@ testConnection gamestate sourceStation targetStationType = performTest
         newElement = [first | first `notElem` list]
 
 
-    findAccessibleStationTypes ::[Position] -> Station -> [Route] -> [StationType]
+    findAccessibleStationTypes :: [Position] -> Station -> [Route] -> [StationType]
     findAccessibleStationTypes visitedStations station routes = followingStationTypes
       where
         updatedVisitedStations = addUniquely [stationPosition] visitedStations
@@ -253,7 +257,7 @@ transferPassengersHelper gamestate (locomotive:rest) station = (newLocomotive:ne
     (newLocomotive, newStation) =
       case getLocomotiveStatus locomotive of
         (OnRoute _ _) -> (locomotive, station)
-        (TransferTo _ _) -> transferPassangersToStation locomotive station
+        (TransferTo _ _) -> transferPassangersToStation gamestate locomotive station
         (TransferFrom _ _) -> transferPassangersToLocomotive gamestate locomotive station
         (Ready _ _) -> (locomotive, station)
     (nextLocomotives, nextStation) = transferPassengersHelper gamestate rest newStation
@@ -461,4 +465,4 @@ withGameOver isOver originalActivityOf userWorld userHandler userDrawer =
 
 -- | Create resettable game with starting screen that checks for game over
 run :: IO ()
-run = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState
+run = withGameOver isGameOver (withStartScreen (withReset debugActivityOf)) initialSystem updateGameState drawGameState
