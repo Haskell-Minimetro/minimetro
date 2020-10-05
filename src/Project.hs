@@ -6,6 +6,7 @@ module Project where
 import ActivityOfEnhancements
 import CodeWorld
 import Data.Fixed
+import Data.List
 -- import Data.Text (pack)
 import Drawers
 import System.Random
@@ -103,7 +104,10 @@ transferPassangersToStation gamestate locomotive@(Locomotive passengers directio
   | otherwise = (locomotive, station)
   where
     gamestateWithoutWayBack = gamestate
-    unboardedPassangers = filter (\(Passenger passType) -> not (testConnection gamestateWithoutWayBack station passType)) passengers -- Remove all passengers that are not able to ride to the destination
+    sameColorRoute = find (\(Route routeColor _ _) -> routeColor /= color) (getRoutes gamestate)
+    unboardedPassangers = case sameColorRoute of 
+      Just nextRoute -> filter (\(Passenger passType) -> not (testConnection gamestateWithoutWayBack nextRoute passType)) passengers -- Remove all passengers that are not able to ride to the destination
+      Nothing -> []
     
     trainPassangers = filter (\passenger@(Passenger passType) -> (passType /= stationType) && passenger `notElem` unboardedPassangers) passengers -- Remove all passengers that are the same symbol as the station
     _stationType = getStationType station
@@ -122,26 +126,24 @@ transferPassangersToLocomotive gamestate locomotive@(Locomotive trainPassangers 
     stationPassengers = getStationPassengers station
     maxToTransfer = maxPassengersOnTrain - length trainPassangers
 
-    eligablePassangers = filter (\(Passenger targetType) -> testConnection gamestate station targetType) stationPassengers
+    routes = filter (\(Route c pos1 _) -> c == color && pos1 == position) (getRoutes gamestate)
+    
+    eligablePassangers = filter (\(Passenger targetType) -> any (\r -> testConnection gamestate r targetType) routes) stationPassengers
 
-    newTrainPassangers = trainPassangers ++ take maxToTransfer eligablePassangers
-    newStationsPassengers = filter (\p -> not(isMember p eligablePassangers)) stationPassengers
-
-    isMember _ [] = False
-    isMember n (x:xs)
-      | n == x = True
-      | otherwise = isMember n xs
+    movingPassangers = take maxToTransfer eligablePassangers
+    newTrainPassangers = trainPassangers ++ movingPassangers
+    newStationsPassengers = stationPassengers \\ movingPassangers
 
     updatedLocomotive = Locomotive newTrainPassangers direction (Ready position color)
     updatedStation = Station (getStationType station) (getStationPosition station) newStationsPassengers (getPassengerGen station)
 transferPassangersToLocomotive _ locomotive station = (locomotive, station)
 
 
-testConnection :: GameState -> Station -> StationType -> Bool
-testConnection gamestate sourceStation targetStationType = performTest
+testConnection :: GameState -> Route -> StationType -> Bool
+testConnection gamestate (Route _ _pos1 pos2) targetStationType = performTest
   where 
     performTest :: Bool
-    performTest = length (filter (== targetStationType) (findAccessibleStationTypes [] sourceStation (getRoutes gamestate))) > 0
+    performTest = length (filter (== targetStationType) (findAccessibleStationTypes [] pos2 (getRoutes gamestate))) > 0
 
     addUniquely :: Eq a => [a] -> [a] -> [a]
     addUniquely [] list = list
@@ -150,13 +152,12 @@ testConnection gamestate sourceStation targetStationType = performTest
         newElement = [first | first `notElem` list]
 
 
-    findAccessibleStationTypes :: [Position] -> Station -> [Route] -> [StationType]
-    findAccessibleStationTypes visitedStations station routes = followingStationTypes
+    findAccessibleStationTypes :: [Position] -> Position -> [Route] -> [StationType]
+    findAccessibleStationTypes visitedStations stationPosition routes = followingStationTypes
       where
         updatedVisitedStations = addUniquely [stationPosition] visitedStations
-        stationPosition = getStationPosition station 
         -- Routes from current station
-        newRoutes = filter (\(Route _ pos1 pos2) -> pos1 == stationPosition || pos2 == stationPosition) routes
+        newRoutes = filter (\(Route _ pos1 p2) -> pos1 == stationPosition || p2 == stationPosition) routes
         
         -- To which stations we can go
         allStations = getStations gamestate
@@ -167,7 +168,7 @@ testConnection gamestate sourceStation targetStationType = performTest
             then []
             else map getStationType followingStations ++ othersStationTypes
 
-        othersStationTypes = mconcat (map (\s -> findAccessibleStationTypes updatedVisitedStations s routes) allStations)
+        othersStationTypes = mconcat (map ((\s -> findAccessibleStationTypes updatedVisitedStations s routes) . getStationPosition) allStations)
 
     connectedStations :: [Station] -> [Route] -> [Station]
     connectedStations stations routes = newStations
@@ -176,7 +177,7 @@ testConnection gamestate sourceStation targetStationType = performTest
 
         positionIn :: Position -> [Route] -> Bool
         positionIn _pos [] = False
-        positionIn pos ((Route _ pos1 pos2):rest) = (pos == pos1 || pos == pos2) || positionIn pos rest
+        positionIn pos ((Route _ pos1 p2):rest) = (pos == pos1 || pos == p2) || positionIn pos rest
 
               
                 
@@ -434,7 +435,9 @@ initialSystem =
       Station Rectangle (0, 8) [] (mkStdGen 38),
       Station Circle (-4, -4) [] (mkStdGen 37)
     ] -- Some stations
-    [] -- No Route
+    [ Route brown (2, -6) (-4, -4)
+    , Route brown (-4, -4) (0, 8)
+    , Route red (0, 8) (-6, 2) ] -- No Route
     [] -- No Locomotives
     Play
     0 -- 0 at the clock
