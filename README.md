@@ -2,6 +2,7 @@
 
 This is a Haskell implementation of [famous game](https://store.steampowered.com/app/287980/Mini_Metro/) developed as a course project at Innopolis University. 
 
+![Alt Text](https://media.giphy.com/media/rcpIuabMyyoulvBEq7/giphy.gif)
 
 ## How to run the game
 
