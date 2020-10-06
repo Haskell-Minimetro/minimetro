@@ -72,17 +72,24 @@ drawRoute (Route color station1 station2) = colored color (thickCurve 0.3 positi
 
 -- | Draw locomotive
 drawLocomotive :: Locomotive -> Picture
-drawLocomotive (Locomotive trainPassangers _direction others) = drawing
+drawLocomotive (Locomotive trainCapacity trainPassangers direction others) = drawing
   where
     drawing =
       case others of 
         OnRoute (Route color pos1 pos2) progress -> baseDrawing (getTrainPositionWithProgress progress pos1 pos2) (-(pi / 2 - getAngle pos1 pos2)) color
-        TransferTo pos color -> baseDrawing pos 0 color
-        TransferFrom pos color -> baseDrawing pos 0 color
-        Ready pos color -> baseDrawing pos 0 color
-    baseDrawing (x, y) rotation color =  translated x y (rotated rotation (passengers color <> locomotiveBase color))
-    locomotiveBase locomotiveColor = colored (light locomotiveColor) (solidRectangle 0.66 1)
-    passengers locomotiveColor = translated (-0.13) (-0.25) (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
+        TransferTo _ _ -> blank
+        TransferFrom _ _ -> blank
+        Ready _ _ -> blank
+    rot = case direction of
+      Forward -> pi
+      _ -> 0
+    baseDrawing (x, y) rotation color = translated x y (rotated (rotation+rot) (passengers color <> locomotiveBase color))
+    locomotiveBase locomotiveColor = translated 0 (trainLength/2-0.125) $ colored (light locomotiveColor) (solidRectangle 0.75 (trainLength+0.5))
+    passengers locomotiveColor =  translated (-0.125) 0 (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
+
+    trainLength = wagonLength * numWagons
+    wagonLength = fromIntegral (ceiling (fromIntegral wagonCapacity / 2.0)) * 0.25
+    numWagons = fromIntegral trainCapacity / fromIntegral wagonCapacity
       
 -- | Helper for getting locomotive's position with respect to the progress
 getTrainPositionWithProgress :: Double -> Position -> Position -> Position
@@ -136,9 +143,13 @@ amountOfLinesUsed state = length (getUniqueLinesColors (getRoutes state))
 amountOfTrainsUsed :: GameState -> Int
 amountOfTrainsUsed state = length (getLocomotives state)
 
+amountOfWagonsUsed :: GameState -> Int
+amountOfWagonsUsed state = ceiling $ fromIntegral (sum (map getLocomotiveCapacity (getLocomotives state))) / fromIntegral wagonCapacity
+      
+
 -- | Get current number of assets used
 getAmountOfAssetsUsed :: GameState -> Int
-getAmountOfAssetsUsed state = amountOfLinesUsed state + amountOfTrainsUsed state
+getAmountOfAssetsUsed state = amountOfLinesUsed state + amountOfWagonsUsed state
 
 -- | Get current week number
 getCurrentWeek :: Double -> Int
@@ -154,6 +165,8 @@ drawMode Play = lettering "Click below to start adding trains or lines"
 drawMode Repopulation = lettering "Choose color line where to place the train"
 drawMode (Construction _ (Just _)) = lettering "Choose second station"
 drawMode (Construction _ Nothing) = lettering "Choose first station"
+drawMode WagonAddition = lettering "Choose color line where to place the wagon"
+
 
 -- | Check if this asset is available for usage
 isAssetAvailable :: Bool -> AssetType -> [Color] -> Bool

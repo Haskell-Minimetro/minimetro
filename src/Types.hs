@@ -32,6 +32,7 @@ data LocomotiveStatus = OnRoute Route Double | TransferTo Position Color | Trans
   deriving (Show)
   
 data Locomotive = Locomotive {
+                              getLocomotiveCapacity        :: Int,
                               getLocomotivePassengers      :: [Passenger],
                               getLocomotiveDirection       :: Direction,
                               getLocomotiveStatus          :: LocomotiveStatus
@@ -40,7 +41,7 @@ data Locomotive = Locomotive {
 data Route = Route Color Position Position
   deriving (Show)
 
-data GameMode = Play | Repopulation | Construction Color (Maybe Station) 
+data GameMode = Play | Repopulation | WagonAddition | Construction Color (Maybe Station) 
   deriving (Show)
 
 
