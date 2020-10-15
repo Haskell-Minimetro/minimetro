@@ -493,4 +493,4 @@ withGameOver isOver originalActivityOf userWorld userHandler userDrawer =
 
 -- | Create resettable game with starting screen that checks for game over
 run :: IO ()
-run = withGameOver isGameOver (withStartScreen (withReset debugActivityOf)) initialSystem updateGameState drawGameState
+run = withGameOver isGameOver (withStartScreen (withReset activityOf)) initialSystem updateGameState drawGameState
