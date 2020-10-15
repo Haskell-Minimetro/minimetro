@@ -19,7 +19,7 @@ initialAmountOfAssets = 2
 
 -- | Default speed of the locomotive
 locomotiveSpeed :: Double
-locomotiveSpeed = 1
+locomotiveSpeed = 5
 
 -- | What control we have for the game
 controls :: [Control]
