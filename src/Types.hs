@@ -28,7 +28,8 @@ data Station = Station {
 data Direction = Forward | Backward
   deriving (Eq, Show)
 
-data LocomotiveStatus = OnRoute Route Double | TransferTo Position Color | TransferFrom Position Color | Ready Position Color
+-- TODO: There is no need for position now?
+data LocomotiveStatus = OnRoute Route Double | TransferTo Position Route | TransferFrom Position Route | Ready Position Route
   deriving (Show)
   
 data Locomotive = Locomotive {
@@ -37,8 +38,12 @@ data Locomotive = Locomotive {
                               getLocomotiveStatus          :: LocomotiveStatus
                               }
 
-data Route = Route Color Position Position
-  deriving (Show)
+data Route = Route {
+                    getRouteColor          :: Color,
+                    getFirstRoutePosition  :: Position,
+                    getSecondRoutePosition :: Position
+                   }
+  deriving (Eq, Show)
 
 data GameMode = Play | Repopulation | Construction Color (Maybe Station) 
   deriving (Show)
