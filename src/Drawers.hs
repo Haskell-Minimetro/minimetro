@@ -77,9 +77,9 @@ drawLocomotive (Locomotive trainPassangers _direction others) = drawing
     drawing =
       case others of 
         OnRoute (Route color pos1 pos2) progress -> baseDrawing (getTrainPositionWithProgress progress pos1 pos2) (-(pi / 2 - getAngle pos1 pos2)) color
-        TransferTo pos color -> baseDrawing pos 0 color
-        TransferFrom pos color -> baseDrawing pos 0 color
-        Ready pos color -> baseDrawing pos 0 color
+        TransferTo pos (Route color _ _) -> baseDrawing pos 0 color
+        TransferFrom pos (Route color _ _) -> baseDrawing pos 0 color
+        Ready pos (Route color _ _) -> baseDrawing pos 0 color
     baseDrawing (x, y) rotation color =  translated x y (rotated rotation (passengers color <> locomotiveBase color))
     locomotiveBase locomotiveColor = colored (light locomotiveColor) (solidRectangle 0.66 1)
     passengers locomotiveColor = translated (-0.13) (-0.25) (colored (lighter 0.4 locomotiveColor) (drawPassengersOnTrain trainPassangers))
